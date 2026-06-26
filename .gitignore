@@ -2,3 +2,4 @@
 *.db
 targets.json
 __pycache__
+.encryption_key

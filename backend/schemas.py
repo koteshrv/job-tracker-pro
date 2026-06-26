@@ -25,3 +25,25 @@ class Job(JobBase):
 
     class Config:
         from_attributes = True
+
+class SettingsBase(BaseModel):
+    telegram_chat_id: Optional[str] = None
+    telegram_bot_token: Optional[str] = None
+    cron_schedule: Optional[str] = "0 */4 * * *"
+    active_companies: Optional[str] = None
+
+class Settings(SettingsBase):
+    id: int
+    class Config:
+        from_attributes = True
+
+class ScraperLogBase(BaseModel):
+    jobs_found: int
+    status: str
+    error_message: Optional[str] = None
+
+class ScraperLog(ScraperLogBase):
+    id: int
+    timestamp: datetime
+    class Config:
+        from_attributes = True

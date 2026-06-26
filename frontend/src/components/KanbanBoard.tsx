@@ -4,8 +4,8 @@ import { Card, CardContent } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
 import { format } from "date-fns"
 import axios from "axios"
-
-import { BriefcaseBusiness, Calendar, ExternalLink, ChevronDown, ChevronUp, MapPin, Eye, EyeOff } from "lucide-react"
+import { BriefcaseBusiness, Calendar, ExternalLink, ChevronDown, ChevronUp, MapPin, Eye, EyeOff, Search } from "lucide-react"
+import { JobModal } from "./JobModal"
 
 export type Job = {
   id: number
@@ -15,6 +15,7 @@ export type Job = {
   location?: string
   status: string
   notes?: string
+  cover_letter?: string
   created_at: string
   applied_at?: string
 }
@@ -30,6 +31,8 @@ export function KanbanBoard() {
   const [jobs, setJobs] = useState<Job[]>([])
   const [expandedCompanies, setExpandedCompanies] = useState<Record<string, boolean>>({})
   const [showArchived, setShowArchived] = useState(false)
+  const [searchQuery, setSearchQuery] = useState("")
+  const [selectedJob, setSelectedJob] = useState<Job | null>(null)
   
   useEffect(() => {
     fetchJobs()
@@ -77,8 +80,14 @@ export function KanbanBoard() {
       {...provided.dragHandleProps}
       style={provided.draggableProps.style}
       className="mb-3"
+      onClick={(e) => {
+        // Only open modal if we didn't click the external link
+        if (!(e.target as HTMLElement).closest('a')) {
+          setSelectedJob(job)
+        }
+      }}
     >
-      <Card className={`bg-zinc-950/90 border-white/5 hover:border-white/20 transition-colors shadow-lg ${snapshot.isDragging ? 'ring-2 ring-indigo-500/50 shadow-indigo-500/20 z-50' : ''}`}>
+      <Card className={`bg-zinc-950/90 border-white/5 hover:border-white/20 hover:bg-zinc-900 cursor-pointer transition-colors shadow-lg ${snapshot.isDragging ? 'ring-2 ring-indigo-500/50 shadow-indigo-500/20 z-50' : ''}`}>
         <CardContent className="p-4">
           <div className="flex justify-between items-start gap-3 mb-2">
             <div className="flex items-center gap-2 text-zinc-300 font-medium text-sm truncate flex-1">
@@ -115,28 +124,50 @@ export function KanbanBoard() {
     </div>
   )}
 
-  const archivedCount = jobs.filter(j => j.status === "REJECTED").length
+  const filteredJobs = jobs.filter(j => {
+    const q = searchQuery.toLowerCase()
+    return j.title.toLowerCase().includes(q) || j.company.toLowerCase().includes(q)
+  })
+
+  const archivedCount = filteredJobs.filter(j => j.status === "REJECTED").length
   const columnsToRender = COLUMNS.filter(c => showArchived || c.id !== "REJECTED")
 
   return (
-    <div className="flex flex-col h-full">
-      {/* Archive Toggle Bar */}
-      {archivedCount > 0 && (
-        <div className="flex justify-end mb-4">
-          <button 
-            onClick={() => setShowArchived(!showArchived)}
-            className="flex items-center gap-2 text-xs font-medium text-zinc-400 hover:text-white transition-colors bg-zinc-900/50 px-3 py-1.5 rounded-full border border-white/5"
-          >
-            {showArchived ? <EyeOff className="w-3.5 h-3.5"/> : <Eye className="w-3.5 h-3.5"/>}
-            {showArchived ? "Hide Archived" : `Show Archived (${archivedCount})`}
-          </button>
+    <div className="flex flex-col h-full relative">
+      
+      {/* Controls Bar */}
+      <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 mb-6">
+        <div className="relative max-w-md w-full">
+          <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-zinc-500" />
+          <input 
+            type="text" 
+            placeholder="Search roles, companies..." 
+            value={searchQuery}
+            onChange={(e) => setSearchQuery(e.target.value)}
+            className="w-full bg-zinc-900/50 border border-white/10 rounded-full pl-10 pr-4 py-2 text-sm text-zinc-200 placeholder:text-zinc-600 focus:outline-none focus:border-blue-500/50 focus:bg-zinc-900 transition-all"
+          />
         </div>
-      )}
+
+        <button
+          onClick={() => setShowArchived(!showArchived)}
+          className={`flex items-center gap-2 px-4 py-2 rounded-full text-xs font-semibold transition-all ${
+            showArchived 
+            ? 'bg-red-500/10 text-red-400 border border-red-500/20' 
+            : 'bg-zinc-800/50 text-zinc-400 border border-white/5 hover:bg-zinc-800'
+          }`}
+        >
+          {showArchived ? <EyeOff className="w-3.5 h-3.5" /> : <Eye className="w-3.5 h-3.5" />}
+          {showArchived ? 'Hide Archived' : 'Show Archived'}
+          {archivedCount > 0 && (
+            <span className="bg-white/10 px-1.5 py-0.5 rounded-md ml-1">{archivedCount}</span>
+          )}
+        </button>
+      </div>
 
       <DragDropContext onDragEnd={onDragEnd}>
         <div className={`grid gap-6 h-full items-start ${showArchived ? 'grid-cols-1 lg:grid-cols-4' : 'grid-cols-1 lg:grid-cols-3'}`}>
         {columnsToRender.map((col) => {
-          const columnJobs = jobs.filter(j => j.status === col.id)
+          const columnJobs = filteredJobs.filter(j => j.status === col.id)
           
           return (
             <div 
@@ -187,7 +218,7 @@ export function KanbanBoard() {
                                     <div className="pt-2 pb-1">
                                       {companyJobs.map((job) => {
                                         // Global index for draggables
-                                        const globalIndex = jobs.findIndex(j => j.id === job.id)
+                                        const globalIndex = filteredJobs.findIndex(j => j.id === job.id)
                                         return (
                                           <Draggable key={job.id} draggableId={job.id.toString()} index={globalIndex}>
                                             {(provided, snapshot) => renderJobCard(job, snapshot, provided)}
@@ -204,7 +235,7 @@ export function KanbanBoard() {
                     ) : (
                       /* Standard flat rendering for other columns */
                       columnJobs.map((job) => {
-                        const globalIndex = jobs.findIndex(j => j.id === job.id)
+                        const globalIndex = filteredJobs.findIndex(j => j.id === job.id)
                         return (
                           <Draggable key={job.id} draggableId={job.id.toString()} index={globalIndex}>
                             {(provided, snapshot) => renderJobCard(job, snapshot, provided)}
@@ -222,6 +253,18 @@ export function KanbanBoard() {
         })}
         </div>
       </DragDropContext>
+
+      {/* Modal Overlay */}
+      {selectedJob && (
+        <JobModal 
+          job={selectedJob} 
+          onClose={() => setSelectedJob(null)}
+          onUpdate={(updatedJob) => {
+            setJobs(jobs.map(j => j.id === updatedJob.id ? updatedJob : j))
+            setSelectedJob(updatedJob)
+          }}
+        />
+      )}
     </div>
   )
 }
