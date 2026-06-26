@@ -259,6 +259,90 @@ def process_api_post(target, new_jobs):
         except Exception as e:
             logger.error(f"Error processing API POST for {company} (Keyword: {keyword}): {e}")
 
+def process_tech_mahindra(target, new_jobs):
+    company = target.get("company", "Tech Mahindra")
+    url = target.get("url", "https://careers.techmahindra.com/")
+    no_results_text = target.get("no_results_text", "0 results").lower()
+    
+    headers = {
+        "Accept": "*/*",
+        "Content-Type": "application/x-www-form-urlencoded; charset=UTF-8",
+        "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36",
+        "X-Requested-With": "XMLHttpRequest"
+    }
+    
+    import re
+    import urllib.parse
+    
+    for keyword in KEYWORDS:
+        logger.info(f"Scraping Tech Mahindra for keyword: {keyword}")
+        try:
+            # Step 1: GET request to fetch ASP.NET tokens
+            session = requests.Session()
+            get_r = session.get(url, timeout=15)
+            if get_r.status_code != 200:
+                logger.error(f"Tech Mahindra GET error (Keyword: {keyword}): HTTP {get_r.status_code}")
+                continue
+                
+            viewstate_match = re.search(r'id="__VIEWSTATE"\s+value="(.*?)"', get_r.text)
+            viewstategen_match = re.search(r'id="__VIEWSTATEGENERATOR"\s+value="(.*?)"', get_r.text)
+            eventvalidation_match = re.search(r'id="__EVENTVALIDATION"\s+value="(.*?)"', get_r.text)
+            
+            if not viewstate_match or not viewstategen_match or not eventvalidation_match:
+                logger.error(f"Tech Mahindra token extraction failed for {keyword}")
+                continue
+                
+            viewstate = viewstate_match.group(1)
+            viewstategen = viewstategen_match.group(1)
+            eventvalidation = eventvalidation_match.group(1)
+            
+            # Step 2: Build POST payload
+            payload_dict = {
+                "ctl00$ContentPlaceHolder1$ScriptManager1": "ctl00$ContentPlaceHolder1$ctl04|ctl00$ContentPlaceHolder1$btnFreeSearch",
+                "ctl00$ContentPlaceHolder1$RblList": "IT",
+                "ctl00$ContentPlaceHolder1$txtAdvanceSearch": keyword,
+                "ctl00$ContentPlaceHolder1$txtFirstName": "",
+                "ctl00$ContentPlaceHolder1$txtLastName": "",
+                "ctl00$ContentPlaceHolder1$ddlNationality": "IND",
+                "ctl00$ContentPlaceHolder1$ddlTotExpYears": "Select Experience *",
+                "ctl00$ContentPlaceHolder1$txtUserName": "",
+                "ctl00$ContentPlaceHolder1$ddlType": "Select",
+                "ctl00$ContentPlaceHolder1$txtSkills": "",
+                "ctl00$ContentPlaceHolder1$ddlcountrycode": "Select country code *",
+                "ctl00$ContentPlaceHolder1$txt_MobileNumber": "",
+                "__EVENTTARGET": "",
+                "__EVENTARGUMENT": "",
+                "__LASTFOCUS": "",
+                "__VIEWSTATE": viewstate,
+                "__VIEWSTATEGENERATOR": viewstategen,
+                "__VIEWSTATEENCRYPTED": "",
+                "__EVENTVALIDATION": eventvalidation,
+                "__ASYNCPOST": "true",
+                "ctl00$ContentPlaceHolder1$btnFreeSearch": "Search"
+            }
+            
+            payload = urllib.parse.urlencode(payload_dict)
+            
+            post_r = session.post(url, headers=headers, data=payload, timeout=15)
+                
+            if post_r.status_code != 200:
+                logger.error(f"Tech Mahindra POST error (Keyword: {keyword}): HTTP {post_r.status_code}")
+                continue
+                
+            content_lower = post_r.text.lower()
+            
+            if no_results_text not in content_lower:
+                title = f"{keyword.capitalize()} Role (Tech Mahindra Dynamic Match)"
+                info_url = f"{url} (Search: {keyword})"
+                if not has_been_notified(info_url):
+                    logger.info(f"Adding to batch: {company} - {title}")
+                    new_jobs.append({"company": company, "title": title, "url": info_url})
+            else:
+                logger.info(f"No results found for {company} with keyword {keyword}.")
+                
+        except Exception as e:
+            logger.error(f"Error processing Tech Mahindra (Keyword: {keyword}): {e}")
+
 async def process_playwright(targets, new_jobs):
     if not targets:
         return
@@ -332,6 +416,9 @@ def main():
         elif t_type == "api_post":
             logger.info(f"Running API POST Engine for {target.get('company')}")
             process_api_post(target, new_jobs)
+        elif t_type == "tech_mahindra":
+            logger.info(f"Running Tech Mahindra Custom Engine for {target.get('company')}")
+            process_tech_mahindra(target, new_jobs)
             
     if playwright_targets:
         logger.info(f"Running Playwright Engine for {len(playwright_targets)} targets...")
