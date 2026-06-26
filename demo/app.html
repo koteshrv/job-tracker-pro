@@ -53,52 +53,13 @@
         .mockup-tab.active { display: block; animation: fadeIn 0.3s ease; }
         @keyframes fadeIn { from { opacity: 0; transform: translateY(5px); } to { opacity: 1; transform: translateY(0); } }
     </style>
+
+    <style>
+        body { margin: 0; overflow: hidden; }
+    </style>
 </head>
-<body class="min-h-screen flex flex-col relative antialiased selection:bg-indigo-500/30">
-    <div class="fixed inset-0 z-[-1] bg-grid"></div>
-    <div class="fixed top-0 left-1/4 w-[500px] h-[500px] bg-indigo-600/20 rounded-full blur-[120px] mix-blend-screen z-[-1] animate-float"></div>
-    <div class="fixed bottom-0 right-1/4 w-[600px] h-[600px] bg-purple-600/10 rounded-full blur-[150px] mix-blend-screen z-[-1] animate-float" style="animation-delay: 2s;"></div>
-
-    <main class="flex-grow flex flex-col items-center justify-center p-4 md:p-8 text-center pt-10 pb-32">
-        <div class="max-w-6xl mx-auto space-y-12 w-full">
-            
-            <!-- Hero -->
-            <div class="space-y-6 animate-in fade-in slide-in-from-bottom-8 duration-1000">
-                <div class="w-24 h-24 mx-auto rounded-3xl bg-gradient-to-br from-blue-600 via-indigo-600 to-purple-700 flex items-center justify-center shadow-[0_0_50px_rgba(79,70,229,0.5)]">
-                    <i data-lucide="sparkles" class="w-10 h-10 text-white"></i>
-                </div>
-                <h1 class="font-display text-5xl md:text-7xl font-extrabold tracking-tight">
-                    <span class="text-transparent bg-clip-text bg-gradient-to-r from-white via-zinc-200 to-zinc-500">Job Tracker </span>
-                    <span class="text-transparent bg-clip-text bg-gradient-to-r from-blue-400 to-indigo-600 animate-gradient-x">Pro</span>
-                </h1>
-                <p class="text-lg md:text-xl text-zinc-400 font-medium max-w-2xl mx-auto leading-relaxed">
-                    A self-hosted, full-stack application tracker with automated scraping and AI-tailored resumes.
-                </p>
-                <div class="pt-4 flex flex-col sm:flex-row items-center justify-center gap-4">
-                    <a href="app.html" class="group flex items-center gap-3 px-6 py-3 rounded-xl bg-indigo-600 text-white font-medium hover:bg-indigo-500 border border-indigo-500/30 transition-all duration-300 shadow-xl shadow-indigo-500/20">
-                        <i data-lucide="play" class="w-5 h-5 fill-current"></i> Live Demo
-                    </a>
-                    <a href="https://github.com/koteshrv/job-tracker-pro" class="group flex items-center gap-3 px-6 py-3 rounded-xl bg-[#24292e] text-white font-medium hover:bg-[#2c3137] border border-white/10 transition-all duration-300 shadow-xl">
-                        <svg height="20" viewBox="0 0 16 16" width="20" class="fill-current"><path d="M8 0C3.58 0 0 3.58 0 8c0 3.54 2.29 6.53 5.47 7.59.4.07.55-.17.55-.38 0-.19-.01-.82-.01-1.49-2.01.37-2.53-.49-2.69-.94-.09-.23-.48-.94-.82-1.13-.28-.15-.68-.52-.01-.53.63-.01 1.08.58 1.23.82.72 1.21 1.87.87 2.33.66.07-.52.28-.87.51-1.07-1.78-.2-3.64-.89-3.64-3.95 0-.87.31-1.59.82-2.15-.08-.2-.36-1.02.08-2.12 0 0 .67-.21 2.2.82.64-.18 1.32-.27 2-.27.68 0 1.36.09 2 .27 1.53-1.04 2.2-.82 2.2-.82.44 1.1.16 1.92.08 2.12.51.56.82 1.27.82 2.15 0 3.07-1.87 3.75-3.65 3.95.29.25.54.73.54 1.48 0 1.07-.01 1.93-.01 2.2 0 .21.15.46.55.38A8.013 8.013 0 0016 8c0-4.42-3.58-8-8-8z"></path></svg>
-                        View on GitHub
-                    </a>
-                </div>
-            </div>
-
-            <!-- Interactive Static UI Mockup -->
-            <div class="mt-16 relative mx-auto w-full glass-card rounded-2xl overflow-hidden shadow-[0_0_80px_rgba(79,70,229,0.2)] p-2 animate-in fade-in slide-in-from-bottom-12 duration-1000 delay-300">
-                <div class="bg-[#09090b] rounded-xl overflow-hidden border border-white/10 flex flex-col h-[700px] text-left shadow-inner">
-                    <!-- Browser Chrome -->
-                    <div class="flex items-center gap-2 px-4 py-3 border-b border-white/5 bg-[#12141a]">
-                        <div class="w-3 h-3 rounded-full bg-red-500/80"></div>
-                        <div class="w-3 h-3 rounded-full bg-yellow-500/80"></div>
-                        <div class="w-3 h-3 rounded-full bg-green-500/80"></div>
-                        <div class="mx-auto bg-black/50 px-4 py-1.5 rounded-md text-xs text-zinc-500 font-mono flex items-center gap-2">
-                            <i data-lucide="lock" class="w-3 h-3"></i> localhost:5173
-                        </div>
-                    </div>
-                    
-                    <!-- App UI -->
+<body class="h-screen w-screen bg-[#09090b] flex flex-col antialiased text-white">
+    
                     <div class="flex flex-1 overflow-hidden">
                         <!-- Sidebar -->
                         <div class="w-64 border-r border-white/5 bg-[#12141a] p-4 flex flex-col gap-2">
@@ -393,12 +354,7 @@
                                     </div>
                                 </div>
                             </div>
-                        </div>
-                    </div>
-                </div>
-            </div>
-
-            <script>
+    <script>
                 function switchTab(tabId) {
                     // Update content
                     document.querySelectorAll('.mockup-tab').forEach(t => t.classList.remove('active'));
@@ -414,45 +370,6 @@
                     activeBtn.classList.add('text-indigo-400', 'bg-indigo-500/10');
                 }
             </script>
-
-            <!-- Features -->
-            <div id="features" class="grid md:grid-cols-2 lg:grid-cols-4 gap-6 pt-20 text-left">
-                <div class="glass-card p-6 rounded-2xl group">
-                    <div class="w-12 h-12 bg-blue-500/10 rounded-xl flex items-center justify-center mb-6 group-hover:scale-110 transition-all">
-                        <i data-lucide="bot" class="w-6 h-6 text-blue-400"></i>
-                    </div>
-                    <h3 class="font-display font-bold text-xl mb-3 text-white">Automated Scraping</h3>
-                    <p class="text-zinc-400 text-sm">Headless Playwright engine safely extracts exact roles from enterprise ATS portals.</p>
-                </div>
-                <div class="glass-card p-6 rounded-2xl group">
-                    <div class="w-12 h-12 bg-indigo-500/10 rounded-xl flex items-center justify-center mb-6 group-hover:scale-110 transition-all">
-                        <i data-lucide="kanban" class="w-6 h-6 text-indigo-400"></i>
-                    </div>
-                    <h3 class="font-display font-bold text-xl mb-3 text-white">Kanban Pipeline</h3>
-                    <p class="text-zinc-400 text-sm">Beautiful drag-and-drop dashboard to easily triage and track your job applications.</p>
-                </div>
-                <div class="glass-card p-6 rounded-2xl group">
-                    <div class="w-12 h-12 bg-purple-500/10 rounded-xl flex items-center justify-center mb-6 group-hover:scale-110 transition-all">
-                        <i data-lucide="brain-circuit" class="w-6 h-6 text-purple-400"></i>
-                    </div>
-                    <h3 class="font-display font-bold text-xl mb-3 text-white">AI Tailored Resumes</h3>
-                    <p class="text-zinc-400 text-sm">Generate bespoke `.tex` resumes using Gemini, mapped exactly to job descriptions.</p>
-                </div>
-                <div class="glass-card p-6 rounded-2xl group">
-                    <div class="w-12 h-12 bg-emerald-500/10 rounded-xl flex items-center justify-center mb-6 group-hover:scale-110 transition-all">
-                        <i data-lucide="shield-check" class="w-6 h-6 text-emerald-400"></i>
-                    </div>
-                    <h3 class="font-display font-bold text-xl mb-3 text-white">Self-Hosted</h3>
-                    <p class="text-zinc-400 text-sm">Containerized with Docker, featuring secure JWT auth and local SQLite database.</p>
-                </div>
-            </div>
-        </div>
-    </main>
-
-    <footer class="border-t border-white/5 py-8 w-full text-center text-zinc-500 bg-[#030303]/80 backdrop-blur-md">
-        <p class="font-medium text-sm flex items-center justify-center gap-2">Built with <i data-lucide="heart" class="w-4 h-4 text-red-500 fill-current"></i> by <a href="https://github.com/koteshrv" target="_blank" class="hover:text-indigo-400 transition-colors underline decoration-white/20 underline-offset-2">Hari</a></p>
-    </footer>
-
     <script>lucide.createIcons();</script>
 </body>
 </html>
