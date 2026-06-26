@@ -226,6 +226,39 @@ def process_lever(target, new_jobs):
     except Exception as e:
         logger.error(f"Error processing Lever for {company}: {e}")
 
+def process_api_post(target, new_jobs):
+    company = target.get("company")
+    url = target.get("url")
+    headers = target.get("headers", {})
+    payload_template = target.get("payload", "")
+    no_results_text = target.get("no_results_text", "0").lower()
+    
+    for keyword in KEYWORDS:
+        logger.info(f"Scraping API POST target: {company} for keyword: {keyword}")
+        try:
+            # URL-encode the keyword if it's form data
+            kw_val = urllib.parse.quote(keyword) if "x-www-form-urlencoded" in headers.get("Content-Type", "").lower() else keyword
+            payload = payload_template.replace("{keyword}", kw_val)
+            
+            r = requests.post(url, headers=headers, data=payload.encode('utf-8'), timeout=15)
+                
+            if r.status_code != 200:
+                logger.error(f"API POST error for {company} (Keyword: {keyword}): HTTP {r.status_code}")
+                continue
+                
+            content_lower = r.text.lower()
+            
+            if no_results_text not in content_lower:
+                title = f"{keyword.capitalize()} Role (Automated API Match)"
+                if not has_been_notified(url):
+                    logger.info(f"Adding to batch: {company} - {title}")
+                    new_jobs.append({"company": company, "title": title, "url": url})
+            else:
+                logger.info(f"No results found for {company} with keyword {keyword}.")
+                
+        except Exception as e:
+            logger.error(f"Error processing API POST for {company} (Keyword: {keyword}): {e}")
+
 async def process_playwright(targets, new_jobs):
     if not targets:
         return
@@ -296,6 +329,9 @@ def main():
             process_lever(target, new_jobs)
         elif t_type == "playwright":
             playwright_targets.append(target)
+        elif t_type == "api_post":
+            logger.info(f"Running API POST Engine for {target.get('company')}")
+            process_api_post(target, new_jobs)
             
     if playwright_targets:
         logger.info(f"Running Playwright Engine for {len(playwright_targets)} targets...")

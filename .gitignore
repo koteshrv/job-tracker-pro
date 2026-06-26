@@ -1,3 +1,4 @@
 .env
 *.db
 targets.json
+__pycache__
