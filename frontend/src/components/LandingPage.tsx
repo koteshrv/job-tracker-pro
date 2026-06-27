@@ -1,6 +1,6 @@
 import { motion } from "framer-motion"
 import { useNavigate } from "react-router-dom"
-import { ShieldAlert, Zap, Lock, Sparkles, FileText, ArrowRight, Code2, Search, Target, Cpu, Heart } from "lucide-react"
+import { Zap, Sparkles, FileText, ArrowRight, Code2, Search, Target, Cpu, Heart } from "lucide-react"
 import { useState, useEffect } from "react"
 
 export function LandingPage() {
