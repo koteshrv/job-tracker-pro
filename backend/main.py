@@ -134,24 +134,51 @@ class ExtensionPayload(BaseModel):
     url: str
     page_title: str
     description: str
+    company: str = None
+    title: str = None
+
+@app.get("/api/jobs/extension/parse-title")
+def parse_title_endpoint(page_title: str, db: Session = Depends(get_db)):
+    """Used by Chrome extension to pre-parse the title before user saves it."""
+    settings = crud.get_settings(db)
+    api_key = settings.gemini_api_key if settings else None
+    model_name = settings.gemini_model if settings else None
+    parsed = ai_agent.parse_job_page_title(page_title, api_key, model_name)
+    return parsed
 
 @app.post("/api/jobs/extension", response_model=schemas.Job)
 def save_from_extension(payload: ExtensionPayload, db: Session = Depends(get_db)):
     """Receives a job scraped by the Chrome Extension."""
+    import urllib.parse
     settings = crud.get_settings(db)
     api_key = settings.gemini_api_key if settings else None
-    model_name = settings.gemini_model if settings else None
 
-    # Parse title
-    parsed = ai_agent.parse_job_page_title(payload.page_title, api_key, model_name)
-    company = parsed.get("company", "Unknown Company")
-    title = parsed.get("title", payload.page_title)
+    # Parse domain for source tag
+    try:
+        domain = urllib.parse.urlparse(payload.url).netloc
+        parts = domain.replace("www.", "").split(".")
+        site_name = parts[-2].capitalize() if len(parts) >= 2 else domain
+    except Exception:
+        site_name = "Extension"
+    location_tag = f"Extension ({site_name})"
+
+    # Clean description using AI
+    clean_desc = ai_agent.sanitize_job_description(payload.description, api_key)
+
+    company = payload.company.strip() if payload.company else "Unknown Company"
+    title = payload.title.strip() if payload.title else payload.page_title
 
     # Save to Kanban
-    job = record_job(db, company, title, payload.url, "")
+    job = record_job(db, company, title, payload.url, location_tag)
     
-    # Update description directly
-    job_update = schemas.JobUpdate(description=payload.description)
+    # Always overwrite the card values with the latest parsed/user-edited values
+    update_data = {
+        "description": clean_desc,
+        "location": location_tag,
+        "company": company,
+        "title": title
+    }
+    job_update = schemas.JobUpdate(**update_data)
     return crud.update_job_status(db, job.id, job_update)
 
 @app.get("/api/settings", response_model=schemas.Settings)
@@ -319,8 +346,9 @@ async def fetch_jd(job_id: int, db: Session = Depends(get_db)):
     except ValueError as e:
         raise HTTPException(status_code=403, detail=str(e))
         
-    if not description:
-        raise HTTPException(status_code=500, detail="Failed to fetch job description")
+    settings = crud.get_settings(db)
+    api_key = settings.gemini_api_key if settings else None
+    clean_desc = ai_agent.sanitize_job_description(description, api_key)
         
-    db_job = crud.update_job_status(db, job_id, schemas.JobUpdate(description=description))
-    return {"description": description}
+    db_job = crud.update_job_status(db, job_id, schemas.JobUpdate(description=clean_desc))
+    return {"description": clean_desc}

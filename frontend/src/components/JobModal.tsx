@@ -49,11 +49,39 @@ export function JobModal({ job, onClose, onUpdate, onDelete }: JobModalProps) {
     })
   }, [])
 
+const TECH_KEYWORDS = [
+  "python", "javascript", "typescript", "java", "c++", "c#", ".net", "ruby", "golang", "rust", "php", 
+  "sql", "nosql", "react", "angular", "vue", "node", "express", "django", "flask", "fastapi", "spring", 
+  "docker", "kubernetes", "aws", "azure", "gcp", "terraform", "ansible", "jenkins", "git", "ci/cd", 
+  "graphql", "rest api", "postgresql", "mongodb", "redis", "mysql", "elasticsearch", "kafka", "rabbitmq", 
+  "machine learning", "deep learning", "ai", "llm", "nlp", "pytorch", "tensorflow", "agile", "scrum", 
+  "sre", "devops", "security", "testing", "pytest", "mocha", "jest", "cypress", "webpack", "vite", 
+  "css", "html", "sass", "tailwind", "linux", "bash", "shell", "prometheus", "grafana", "microservices", 
+  "serverless", "amplitude", "tableau", "power bi", "apim", "azure apim", "web security", "k8s", "openshift"
+];
+
   useEffect(() => {
     if (description && extractedKeywords.length > 0) {
       const jdLower = description.toLowerCase()
-      const found = extractedKeywords.filter(k => jdLower.includes(k.toLowerCase())).length
-      setMatchScore(Math.round((found / extractedKeywords.length) * 100))
+      
+      // 1. Identify which of the master tech keywords are requested in the JD
+      const jdSkills = TECH_KEYWORDS.filter(skill => {
+        const escaped = skill.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
+        const regex = new RegExp(`(?:^|\\s|[^a-zA-Z0-9+])(${escaped})(?:$|\\s|[^a-zA-Z0-9+])`, 'i')
+        return regex.test(jdLower)
+      })
+
+      if (jdSkills.length > 0) {
+        // 2. See how many of those JD skills are in the user's resume
+        const matched = jdSkills.filter(skill => 
+          extractedKeywords.some(ek => ek.toLowerCase().includes(skill.toLowerCase()) || skill.toLowerCase().includes(ek.toLowerCase()))
+        ).length
+        setMatchScore(Math.round((matched / jdSkills.length) * 100))
+      } else {
+        // Fallback to original ratio if no master keywords found in JD
+        const found = extractedKeywords.filter(k => jdLower.includes(k.toLowerCase())).length
+        setMatchScore(Math.round((found / extractedKeywords.length) * 100))
+      }
     } else {
       setMatchScore(null)
     }
@@ -321,7 +349,7 @@ export function JobModal({ job, onClose, onUpdate, onDelete }: JobModalProps) {
             )}
 
             {job.cover_letter ? (
-              <div className="bg-zinc-900/50 border border-purple-500/20 rounded-xl p-6 text-sm text-zinc-300 whitespace-pre-wrap font-serif leading-relaxed">
+              <div className="bg-zinc-900/50 border border-purple-500/20 rounded-xl p-6 text-sm text-zinc-300 whitespace-pre-wrap font-sans leading-relaxed">
                 {job.cover_letter}
               </div>
             ) : (

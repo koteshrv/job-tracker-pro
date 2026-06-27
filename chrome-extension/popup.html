@@ -1,78 +1,197 @@
 <!DOCTYPE html>
 <html>
 <head>
+  <meta charset="utf-8">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@400;500;600;700&display=swap" rel="stylesheet">
   <style>
-    body {
-      width: 320px;
-      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
-      padding: 16px;
-      background-color: #09090b;
-      color: #fff;
-      margin: 0;
+    :root {
+      --background: 240 10% 4%;
+      --card: 240 10% 7%;
+      --primary: 217.2 91.2% 59.8%;
+      --primary-hover: 224.3 76.3% 48%;
+      --border: 240 5.9% 15%;
+      --text: 0 0% 98%;
+      --muted: 240 5% 64.9%;
+      --success: 142.1 76.2% 36.3%;
+      --error: 346.8 77.2% 49.8%;
     }
-    h2 { margin-top: 0; font-size: 16px; color: #fff; margin-bottom: 16px; }
-    .input-group { margin-bottom: 12px; }
-    label { display: block; font-size: 11px; margin-bottom: 4px; color: #a1a1aa; text-transform: uppercase; letter-spacing: 0.05em; }
+
+    body {
+      width: 340px;
+      font-family: 'Outfit', -apple-system, sans-serif;
+      padding: 20px;
+      background: radial-gradient(circle at top right, hsl(240 10% 12%), hsl(var(--background)));
+      color: hsl(var(--text));
+      margin: 0;
+      box-sizing: border-box;
+      -webkit-font-smoothing: antialiased;
+    }
+
+    h2 { 
+      margin-top: 0; 
+      font-size: 18px; 
+      font-weight: 700; 
+      color: hsl(var(--text)); 
+      margin-bottom: 20px; 
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      letter-spacing: -0.02em;
+    }
+
+    h2 svg {
+      color: hsl(var(--primary));
+    }
+
+    .view-card {
+      background: hsl(var(--card) / 0.7);
+      backdrop-filter: blur(12px);
+      border: 1px solid hsl(var(--border));
+      border-radius: 12px;
+      padding: 16px;
+      box-shadow: 0 4px 30px rgba(0, 0, 0, 0.4);
+    }
+
+    .input-group { 
+      margin-bottom: 14px; 
+    }
+
+    label { 
+      display: block; 
+      font-size: 11px; 
+      font-weight: 600;
+      margin-bottom: 6px; 
+      color: hsl(var(--muted)); 
+      text-transform: uppercase; 
+      letter-spacing: 0.05em; 
+    }
+
     input {
       width: 100%;
       box-sizing: border-box;
-      padding: 8px 12px;
-      background: #18181b;
-      border: 1px solid #27272a;
-      border-radius: 6px;
-      color: #fff;
+      padding: 10px 14px;
+      background: hsl(var(--background) / 0.5);
+      border: 1px solid hsl(var(--border));
+      border-radius: 8px;
+      color: hsl(var(--text));
       font-size: 13px;
-      transition: border-color 0.2s;
+      transition: all 0.2s cubic-bezier(0.16, 1, 0.3, 1);
     }
+
     input:focus {
       outline: none;
-      border-color: #2563eb;
+      border-color: hsl(var(--primary));
+      box-shadow: 0 0 0 3px hsl(var(--primary) / 0.15);
+      background: hsl(var(--background));
     }
-    button {
+
+    button.btn-primary {
       width: 100%;
-      padding: 10px;
-      background-color: #2563eb;
+      padding: 12px;
+      background-color: hsl(var(--primary));
       color: white;
       border: none;
-      border-radius: 6px;
+      border-radius: 8px;
       cursor: pointer;
       font-weight: 600;
       font-size: 13px;
-      transition: background-color 0.2s;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 8px;
+      box-shadow: 0 4px 12px hsl(var(--primary) / 0.25);
+      transition: all 0.2s cubic-bezier(0.16, 1, 0.3, 1);
     }
-    button:hover { background-color: #1d4ed8; }
-    button:disabled { background-color: #3f3f46; cursor: not-allowed; color: #a1a1aa; }
-    #status { margin-top: 12px; font-size: 13px; text-align: center; }
-    .success { color: #22c55e; }
-    .error { color: #ef4444; }
+
+    button.btn-primary:hover { 
+      background-color: hsl(var(--primary-hover));
+      transform: translateY(-1px);
+      box-shadow: 0 6px 16px hsl(var(--primary) / 0.3);
+    }
+
+    button.btn-primary:active {
+      transform: translateY(0);
+    }
+
+    button.btn-primary:disabled { 
+      background-color: hsl(var(--border)); 
+      cursor: not-allowed; 
+      color: hsl(var(--muted));
+      box-shadow: none;
+      transform: none;
+    }
+
+    #status { 
+      margin-top: 16px; 
+      font-size: 12px; 
+      font-weight: 500;
+      text-align: center; 
+      padding: 8px 12px;
+      border-radius: 6px;
+      display: none;
+    }
+
+    #status.success { 
+      display: block;
+      color: hsl(var(--success)); 
+      background: hsl(var(--success) / 0.1);
+      border: 1px solid hsl(var(--success) / 0.2);
+    }
+
+    #status.error { 
+      display: block;
+      color: hsl(var(--error)); 
+      background: hsl(var(--error) / 0.1);
+      border: 1px solid hsl(var(--error) / 0.2);
+    }
+
     .hidden { display: none !important; }
     
-    /* View specific styles */
-    .view-card {
-      background: #09090b;
-    }
     .footer-actions {
       margin-top: 16px;
       display: flex;
       justify-content: space-between;
       align-items: center;
-      border-t: 1px solid #27272a;
+      border-top: 1px solid hsl(var(--border));
       padding-top: 12px;
     }
+
     .text-link {
       font-size: 11px;
-      color: #a1a1aa;
-      text-decoration: underline;
+      color: hsl(var(--muted));
+      text-decoration: none;
       cursor: pointer;
       background: none;
       border: none;
       padding: 0;
+      font-weight: 500;
+      transition: color 0.15s;
     }
-    .text-link:hover { color: #ef4444; }
+
+    .text-link:hover { 
+      color: hsl(var(--error)); 
+    }
+
+    .pulse {
+      animation: pulse-animation 2s infinite;
+    }
+
+    @keyframes pulse-animation {
+      0% { opacity: 1; }
+      50% { opacity: 0.6; }
+      100% { opacity: 1; }
+    }
   </style>
 </head>
 <body>
-  <h2>Job Tracker Pro</h2>
+  <h2>
+    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+      <path d="M12 2L2 7l10 5 10-5-10-5zM2 17l10 5 10-5M2 12l10 5 10-5"/>
+    </svg>
+    Job Tracker Pro
+  </h2>
 
   <!-- Login View -->
   <div id="loginView" class="view-card">
@@ -88,14 +207,43 @@
       <label for="password">Password</label>
       <input type="password" id="password" placeholder="Password" />
     </div>
-    <button id="loginBtn" style="margin-top: 8px;">Log In & Sync</button>
+    <button id="loginBtn" class="btn-primary" style="margin-top: 8px;">
+      Log In & Sync
+    </button>
   </div>
 
   <!-- Action View -->
   <div id="actionView" class="view-card hidden">
-    <button id="saveBtn">Save Active Job</button>
+    <div id="parseIndicator" style="margin-bottom: 12px; font-size: 12px; font-weight: 500; display: flex; align-items: center; gap: 8px; color: hsl(var(--muted));">
+      <svg class="pulse" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
+        <circle cx="12" cy="12" r="10"></circle>
+        <line x1="12" y1="8" x2="12" y2="16"></line>
+        <line x1="8" y1="12" x2="16" y2="12"></line>
+      </svg>
+      Parsing page details with AI...
+    </div>
+    
+    <div class="input-group">
+      <label for="jobCompany">Company</label>
+      <input type="text" id="jobCompany" placeholder="Loading..." />
+    </div>
+    
+    <div class="input-group" style="margin-bottom: 16px;">
+      <label for="jobTitle">Job Title</label>
+      <input type="text" id="jobTitle" placeholder="Loading..." />
+    </div>
+
+    <button id="saveBtn" class="btn-primary" disabled>
+      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+        <path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z"/>
+        <polyline points="17 21 17 13 7 13 7 21"/>
+        <polyline points="7 3 7 8 15 8"/>
+      </svg>
+      Save Active Job
+    </button>
+    
     <div class="footer-actions">
-      <span id="activeUser" style="font-size: 11px; color: #71717a;"></span>
+      <span id="activeUser" style="font-size: 11px; color: hsl(var(--muted)); font-weight: 500;"></span>
       <button id="logoutBtn" class="text-link">Log Out</button>
     </div>
   </div>

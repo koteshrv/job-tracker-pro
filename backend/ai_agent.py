@@ -212,3 +212,35 @@ Page Title: "{page_title}"
     except Exception as e:
         logger.error(f"Failed to parse job page title: {e}")
         return {"company": "Unknown Company", "title": page_title}
+
+def sanitize_job_description(raw_text: str, api_key: str = None) -> str:
+    """Uses gemini-2.5-flash to extract a clean, structured job description in markdown."""
+    if not raw_text or len(raw_text.strip()) < 10:
+        return raw_text
+        
+    prompt = f"""
+You are an expert technical recruiter.
+Clean up the following raw text scraped from a job board webpage. 
+1. Remove all cookies warning text, privacy policy notices, navigation bars, headers, and footers.
+2. Structure the remaining core job requirements into clean, beautifully formatted Markdown.
+3. Output ONLY the clean Markdown text containing sections like Overview/Role, Responsibilities, Requirements, and Benefits. Do NOT add commentary, wrappers, or markdown code fences.
+
+Raw Webpage Text:
+---
+{raw_text[:12000]}
+---
+"""
+    # Hardcode gemini-2.5-flash for this utility task to be fast and save limits
+    result = _generate(prompt, api_key, "gemini-2.5-flash")
+    if result.startswith("Error") or not result.strip():
+        return raw_text  # Fallback to raw text if AI fails
+        
+    # Clean up code fences just in case
+    clean = result.strip()
+    if clean.startswith("```"):
+        lines = clean.split("\n")
+        if lines[0].startswith("```"): lines = lines[1:]
+        if lines[-1].startswith("```"): lines = lines[:-1]
+        clean = "\n".join(lines).strip()
+        
+    return clean

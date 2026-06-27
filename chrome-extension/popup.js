@@ -13,6 +13,18 @@ document.addEventListener('DOMContentLoaded', () => {
   const activeUserSpan = document.getElementById('activeUser');
   const statusDiv = document.getElementById('status');
 
+  const jobCompanyInput = document.getElementById('jobCompany');
+  const jobTitleInput = document.getElementById('jobTitle');
+  const parseIndicator = document.getElementById('parseIndicator');
+
+  const saveIcon = `
+    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+      <path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z"/>
+      <polyline points="17 21 17 13 7 13 7 21"/>
+      <polyline points="7 3 7 8 15 8"/>
+    </svg>
+  `;
+
   // Check auth status on load
   chrome.storage.local.get(['token', 'apiUrl', 'username'], (result) => {
     if (result.apiUrl) apiUrlInput.value = result.apiUrl;
@@ -27,14 +39,63 @@ document.addEventListener('DOMContentLoaded', () => {
   function showLoginView() {
     loginView.classList.remove('hidden');
     actionView.classList.add('hidden');
+    statusDiv.className = "";
     statusDiv.innerText = "";
   }
 
-  function showActionView(username) {
+  async function showActionView(username) {
     loginView.classList.add('hidden');
     actionView.classList.remove('hidden');
     activeUserSpan.innerText = `Connected as ${username}`;
+    statusDiv.className = "";
     statusDiv.innerText = "";
+
+    // Pre-populate & run AI parser immediately
+    saveBtn.disabled = true;
+    parseIndicator.classList.remove('hidden');
+    jobCompanyInput.value = "";
+    jobTitleInput.value = "";
+    jobCompanyInput.disabled = true;
+    jobTitleInput.disabled = true;
+
+    chrome.storage.local.get(['token', 'apiUrl'], async (stored) => {
+      const { token, apiUrl } = stored;
+      try {
+        const [tab] = await chrome.tabs.query({ active: true, currentWindow: true });
+        if (!tab) throw new Error("No active tab");
+
+        const pageTitle = tab.title || "Unknown Job Page";
+        
+        // Fetch parsing from API
+        const response = await fetch(`${apiUrl}/api/jobs/extension/parse-title?page_title=${encodeURIComponent(pageTitle)}`, {
+          headers: { 'Authorization': `Bearer ${token}` }
+        });
+
+        if (!response.ok) {
+          throw new Error("Could not parse");
+        }
+
+        const data = await response.json();
+        jobCompanyInput.value = data.company || "Unknown Company";
+        jobTitleInput.value = data.title || pageTitle;
+      } catch (err) {
+        // Fallback to raw page title
+        try {
+          const [tab] = await chrome.tabs.query({ active: true, currentWindow: true });
+          jobCompanyInput.value = "Unknown Company";
+          jobTitleInput.value = tab ? tab.title : "Unknown Title";
+        } catch {
+          jobCompanyInput.value = "Unknown Company";
+          jobTitleInput.value = "Unknown Title";
+        }
+      } finally {
+        // Enable fields so the user can review and edit
+        jobCompanyInput.disabled = false;
+        jobTitleInput.disabled = false;
+        parseIndicator.classList.add('hidden');
+        saveBtn.disabled = false;
+      }
+    });
   }
 
   // Handle Login
@@ -44,12 +105,13 @@ document.addEventListener('DOMContentLoaded', () => {
     const password = passwordInput.value;
 
     if (!username || !password) {
-      showStatus("Please enter username and password", "error");
+      showStatus("Please enter credentials", "error");
       return;
     }
 
     loginBtn.disabled = true;
     loginBtn.innerText = "Authenticating...";
+    statusDiv.className = "";
     statusDiv.innerText = "";
 
     try {
@@ -65,7 +127,6 @@ document.addEventListener('DOMContentLoaded', () => {
 
       const data = await response.json();
       
-      // Save settings to extension storage
       chrome.storage.local.set({ 
         token: data.token, 
         apiUrl: apiUrl,
@@ -92,8 +153,24 @@ document.addEventListener('DOMContentLoaded', () => {
         return;
       }
 
+      const company = jobCompanyInput.value.trim();
+      const title = jobTitleInput.value.trim();
+
+      if (!company || !title) {
+        showStatus("Please fill in Company and Job Title", "error");
+        return;
+      }
+
       saveBtn.disabled = true;
-      saveBtn.innerText = "Extracting content...";
+      saveBtn.innerHTML = `
+        <svg class="pulse" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+          <circle cx="12" cy="12" r="10"></circle>
+          <line x1="12" y1="8" x2="12" y2="12"></line>
+          <line x1="12" y1="16" x2="12.01" y2="16"></line>
+        </svg>
+        Extracting page content...
+      `;
+      statusDiv.className = "";
       statusDiv.innerText = "";
 
       try {
@@ -115,7 +192,22 @@ document.addEventListener('DOMContentLoaded', () => {
           }
         });
 
-        saveBtn.innerText = "Saving to board...";
+        saveBtn.innerHTML = `
+          <svg class="pulse" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+            <polyline points="23 6 13.5 15.5 8.5 10.5 1 18"></polyline>
+            <polyline points="17 6 23 6 23 12"></polyline>
+          </svg>
+          Saving & Sanitizing JD...
+        `;
+
+        // Send custom Company + Title alongside scraped content
+        const payload = {
+          url: result.url,
+          page_title: result.page_title,
+          description: result.description,
+          company: company,
+          title: title
+        };
 
         const response = await fetch(`${apiUrl}/api/jobs/extension`, {
           method: 'POST',
@@ -123,7 +215,7 @@ document.addEventListener('DOMContentLoaded', () => {
             'Content-Type': 'application/json',
             'Authorization': `Bearer ${token}`
           },
-          body: JSON.stringify(result)
+          body: JSON.stringify(payload)
         });
 
         if (!response.ok) {
@@ -142,7 +234,7 @@ document.addEventListener('DOMContentLoaded', () => {
         showStatus(err.message || "Failed to save job", "error");
       } finally {
         saveBtn.disabled = false;
-        saveBtn.innerText = "Save Active Job";
+        saveBtn.innerHTML = `${saveIcon} Save Active Job`;
       }
     });
   });

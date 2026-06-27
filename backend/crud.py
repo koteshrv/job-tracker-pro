@@ -3,7 +3,7 @@ from . import models, schemas
 from .crypto import encrypt_value, decrypt_value
 
 def get_jobs(db: Session, skip: int = 0, limit: int = 100):
-    return db.query(models.Job).offset(skip).limit(limit).all()
+    return db.query(models.Job).order_by(models.Job.created_at.desc()).offset(skip).limit(limit).all()
 
 def get_job(db: Session, job_id: int):
     return db.query(models.Job).filter(models.Job.id == job_id).first()

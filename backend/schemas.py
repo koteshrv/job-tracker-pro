@@ -24,6 +24,9 @@ class JobCreate(JobBase):
     pass
 
 class JobUpdate(BaseModel):
+    company: Optional[str] = None
+    title: Optional[str] = None
+    location: Optional[str] = None
     status: Optional[str] = None
     notes: Optional[str] = None
     description: Optional[str] = None

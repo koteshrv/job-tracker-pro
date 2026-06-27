@@ -49,6 +49,15 @@ export function KanbanBoard() {
 
   useEffect(() => {
     fetchJobs()
+
+    const handleFocus = () => {
+      fetchJobs()
+    }
+
+    window.addEventListener("focus", handleFocus)
+    return () => {
+      window.removeEventListener("focus", handleFocus)
+    }
   }, [])
 
   const moveToTrash = async (jobId: number) => {
