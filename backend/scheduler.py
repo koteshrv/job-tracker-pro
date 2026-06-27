@@ -16,6 +16,13 @@ def _scheduled_scrape():
     db = SessionLocal()
     log = crud.create_scraper_log(db, schemas.ScraperLogBase(jobs_found=0, status="RUNNING", trigger_source="CRON"))
     try:
+        settings = crud.get_settings(db)
+        # Clean old trash before scraping
+        if settings.trash_retention_days > 0:
+            deleted_trash = crud.clean_old_trash(db, settings.trash_retention_days)
+            if deleted_trash > 0:
+                logger.info(f"Cleaned up {deleted_trash} old trash items.")
+                
         new_jobs = run_scraper(db)
         crud.update_scraper_log(db, log.id, jobs_found=len(new_jobs), status="SUCCESS")
         logger.info(f"Scheduled scrape complete. Found {len(new_jobs)} new jobs.")

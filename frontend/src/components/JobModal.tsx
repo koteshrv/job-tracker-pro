@@ -11,7 +11,7 @@ interface JobModalProps {
   job: Job
   onClose: () => void
   onUpdate: (updatedJob: Job) => void
-  onDelete: (jobId: number) => void
+  onDelete: (jobId: number) => void // Used for permanent deletion now
 }
 
 export function JobModal({ job, onClose, onUpdate, onDelete }: JobModalProps) {
@@ -27,6 +27,7 @@ export function JobModal({ job, onClose, onUpdate, onDelete }: JobModalProps) {
   const [resumes, setResumes] = useState<string[]>([])
   const [selectedResume, setSelectedResume] = useState<string>("")
   const [confirmDeleteOpen, setConfirmDeleteOpen] = useState(false)
+  const [downloadingPdf, setDownloadingPdf] = useState(false)
 
   useEffect(() => {
     api.get("/api/resumes").then(res => {
@@ -48,6 +49,17 @@ export function JobModal({ job, onClose, onUpdate, onDelete }: JobModalProps) {
       toast("Error saving notes", "error")
     }
     setSavingNotes(false)
+  }
+
+  const handleSoftDelete = async () => {
+    try {
+      const res = await api.put(`/api/jobs/${job.id}`, { status: "TRASH" })
+      onUpdate(res.data)
+      toast("Moved to Trash", "success")
+      onClose()
+    } catch {
+      toast("Failed to move to Trash", "error")
+    }
   }
 
   const handleGenerateCL = async () => {
@@ -101,24 +113,20 @@ export function JobModal({ job, onClose, onUpdate, onDelete }: JobModalProps) {
 
   const handleDownloadPdf = async () => {
     if (!tailoredResume) return
-    const { jsPDF } = await import("jspdf")
-    const doc = new jsPDF({ unit: "pt", format: "a4" })
-    doc.setFont("courier", "normal")
-    doc.setFontSize(9)
-    const margin = 40
-    const maxWidth = doc.internal.pageSize.getWidth() - margin * 2
-    const lines = doc.splitTextToSize(tailoredResume, maxWidth)
-    const lineHeight = 12
-    let y = margin
-    for (const line of lines) {
-      if (y > doc.internal.pageSize.getHeight() - margin) {
-        doc.addPage()
-        y = margin
-      }
-      doc.text(line, margin, y)
-      y += lineHeight
+    setDownloadingPdf(true)
+    try {
+      const res = await api.get(`/api/jobs/${job.id}/resume/pdf`, { responseType: 'blob' })
+      const url = URL.createObjectURL(res.data)
+      const a = document.createElement("a")
+      a.href = url
+      a.download = `${slug}.pdf`
+      a.click()
+      URL.revokeObjectURL(url)
+      toast("PDF Downloaded", "success")
+    } catch (e) {
+      toast("Failed to compile PDF. Ensure LaTeX is working.", "error")
     }
-    doc.save(`${slug}.pdf`)
+    setDownloadingPdf(false)
   }
 
   return (
@@ -148,13 +156,24 @@ export function JobModal({ job, onClose, onUpdate, onDelete }: JobModalProps) {
             <a href={job.url} target="_blank" rel="noopener noreferrer" className="p-2 text-zinc-400 hover:text-white hover:bg-white/5 rounded-lg transition-colors">
               <ExternalLink className="w-5 h-5" />
             </a>
-            <button
-              onClick={() => setConfirmDeleteOpen(true)}
-              className="p-2 text-zinc-400 hover:text-red-400 hover:bg-red-500/10 rounded-lg transition-colors"
-              title="Delete job"
-            >
-              <Trash2 className="w-5 h-5" />
-            </button>
+            {job.status === "TRASH" ? (
+              <button
+                onClick={() => setConfirmDeleteOpen(true)}
+                className="p-2 text-red-400 hover:text-red-300 hover:bg-red-500/10 rounded-lg transition-colors flex items-center gap-2"
+                title="Permanently Delete"
+              >
+                <Trash2 className="w-4 h-4" />
+                <span className="text-xs font-semibold">Delete Forever</span>
+              </button>
+            ) : (
+              <button
+                onClick={handleSoftDelete}
+                className="p-2 text-zinc-400 hover:text-red-400 hover:bg-red-500/10 rounded-lg transition-colors"
+                title="Move to Trash"
+              >
+                <Trash2 className="w-5 h-5" />
+              </button>
+            )}
             <button onClick={onClose} className="p-2 text-zinc-400 hover:text-white hover:bg-white/5 rounded-lg transition-colors">
               <X className="w-5 h-5" />
             </button>
@@ -248,8 +267,12 @@ export function JobModal({ job, onClose, onUpdate, onDelete }: JobModalProps) {
                     <Button onClick={handleDownloadTex} className="bg-zinc-800 hover:bg-zinc-700 text-white h-8 text-xs">
                       <Download className="w-3.5 h-3.5 mr-1" /> .tex
                     </Button>
-                    <Button onClick={handleDownloadPdf} className="bg-zinc-800 hover:bg-zinc-700 text-white h-8 text-xs">
-                      <Download className="w-3.5 h-3.5 mr-1" /> .pdf
+                    <Button onClick={handleDownloadPdf} disabled={downloadingPdf} className="bg-zinc-800 hover:bg-zinc-700 text-white h-8 text-xs">
+                      {downloadingPdf ? (
+                        "Compiling PDF..."
+                      ) : (
+                        <><Download className="w-3.5 h-3.5 mr-1" /> .pdf</>
+                      )}
                     </Button>
                   </>
                 )}

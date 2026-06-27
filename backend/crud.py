@@ -42,6 +42,24 @@ def delete_all_jobs(db: Session) -> int:
     db.commit()
     return count
 
+def empty_trash(db: Session) -> int:
+    count = db.query(models.Job).filter(models.Job.status == "TRASH").delete(synchronize_session=False)
+    db.commit()
+    return count
+
+def clean_old_trash(db: Session, retention_days: int) -> int:
+    from datetime import datetime, timedelta
+    from sqlalchemy import func
+    
+    cutoff = datetime.now() - timedelta(days=retention_days)
+    count = db.query(models.Job).filter(
+        models.Job.status == "TRASH",
+        # Fallback to created_at if updated_at is null (for older items)
+        func.coalesce(models.Job.updated_at, models.Job.created_at) < cutoff
+    ).delete(synchronize_session=False)
+    db.commit()
+    return count
+
 def bulk_update_status(db: Session, ids: list, status: str) -> int:
     count = db.query(models.Job).filter(models.Job.id.in_(ids)).update(
         {models.Job.status: status}, synchronize_session=False)

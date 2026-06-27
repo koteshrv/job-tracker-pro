@@ -28,10 +28,11 @@ const COLUMNS = [
   { id: "APPLIED", title: "Applied", color: "from-indigo-500/20 to-purple-500/10", border: "border-indigo-500/20", badge: "bg-indigo-500/20 text-indigo-300 border-indigo-500/30" },
   { id: "INTERVIEWING", title: "Interviewing", color: "from-amber-500/20 to-orange-500/10", border: "border-amber-500/20", badge: "bg-amber-500/20 text-amber-300 border-amber-500/30" },
   { id: "REJECTED", title: "Rejected", color: "from-red-500/20 to-rose-600/10", border: "border-red-500/20", badge: "bg-red-500/20 text-red-300 border-red-500/30" },
-  { id: "IGNORED", title: "Ignored", color: "from-zinc-500/20 to-zinc-600/10", border: "border-zinc-500/20", badge: "bg-zinc-800 text-zinc-400 border-zinc-700" }
+  { id: "IGNORED", title: "Ignored", color: "from-zinc-500/20 to-zinc-600/10", border: "border-zinc-500/20", badge: "bg-zinc-800 text-zinc-400 border-zinc-700" },
+  { id: "TRASH", title: "Trash", color: "from-red-950/20 to-red-900/10", border: "border-red-900/30 border-dashed", badge: "bg-red-900/20 text-red-500 border-red-900/30" }
 ]
 
-const ARCHIVED_STATUSES = ["REJECTED", "IGNORED"]
+const ARCHIVED_STATUSES = ["REJECTED", "IGNORED", "TRASH"]
 
 export function KanbanBoard() {
   const { toast } = useToast()
@@ -48,6 +49,16 @@ export function KanbanBoard() {
   useEffect(() => {
     fetchJobs()
   }, [])
+
+  const moveToTrash = async (jobId: number) => {
+    try {
+      await api.put(`/api/jobs/${jobId}`, { status: "TRASH" })
+      setJobs(prev => prev.map(j => j.id === jobId ? { ...j, status: "TRASH" } : j))
+      toast("Moved to Trash", "success")
+    } catch (e) {
+      toast("Failed to move to Trash", "error")
+    }
+  }
 
   const toggleSelect = (id: number) => {
     setSelectedIds(prev => prev.includes(id) ? prev.filter(x => x !== id) : [...prev, id])
@@ -169,9 +180,20 @@ export function KanbanBoard() {
               </div>
               <span className="truncate" title={job.company}>{job.company}</span>
             </div>
-            <a href={job.url} target="_blank" rel="noreferrer" className="text-zinc-500 hover:text-white transition-colors shrink-0">
-              <ExternalLink className="w-4 h-4" />
-            </a>
+            <div className="flex items-center gap-1 shrink-0">
+              <a href={job.url} target="_blank" rel="noreferrer" className="p-1 text-zinc-500 hover:text-white hover:bg-white/10 rounded transition-colors" title="View Job">
+                <ExternalLink className="w-4 h-4" />
+              </a>
+              {job.status !== "TRASH" && (
+                <button
+                  onClick={(e) => { e.stopPropagation(); moveToTrash(job.id) }}
+                  className="p-1 text-zinc-500 hover:text-red-400 hover:bg-red-500/10 rounded transition-colors"
+                  title="Move to Trash"
+                >
+                  <Trash2 className="w-4 h-4" />
+                </button>
+              )}
+            </div>
           </div>
           
           <p className="text-sm font-semibold text-white leading-tight mb-3 line-clamp-2" title={job.title}>
@@ -381,6 +403,7 @@ export function KanbanBoard() {
             { label: "Interviewing", status: "INTERVIEWING" },
             { label: "Rejected", status: "REJECTED" },
             { label: "Ignored", status: "IGNORED" },
+            { label: "Trash", status: "TRASH" },
           ].map(a => (
             <button
               key={a.status}

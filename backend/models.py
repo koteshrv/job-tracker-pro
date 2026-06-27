@@ -18,6 +18,7 @@ class Job(Base):
     tailored_resume = Column(Text, nullable=True)
     
     created_at = Column(DateTime(timezone=True), server_default=func.now())
+    updated_at = Column(DateTime(timezone=True), onupdate=func.now())
     applied_at = Column(DateTime(timezone=True), nullable=True)
 
 class Settings(Base):
@@ -29,6 +30,7 @@ class Settings(Base):
     gemini_api_key = Column(String, nullable=True) # Encrypted
     gemini_model = Column(String, default="gemini-2.5-flash")
     cron_schedule = Column(String, default="0 */4 * * *")
+    trash_retention_days = Column(Integer, default=30)
     active_companies = Column(String, nullable=True) # JSON array of active companies
     search_keywords = Column(String, nullable=True) # JSON array of search keywords
 

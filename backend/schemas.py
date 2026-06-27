@@ -35,6 +35,7 @@ class Job(JobBase):
     cover_letter: Optional[str] = None
     tailored_resume: Optional[str] = None
     created_at: datetime
+    updated_at: Optional[datetime] = None
     applied_at: Optional[datetime] = None
 
     class Config:
@@ -46,6 +47,7 @@ class SettingsBase(BaseModel):
     gemini_api_key: Optional[str] = None
     gemini_model: Optional[str] = "gemini-2.5-flash"
     cron_schedule: Optional[str] = "0 */4 * * *"
+    trash_retention_days: Optional[int] = 30
     active_companies: Optional[str] = None
     search_keywords: Optional[str] = None
 

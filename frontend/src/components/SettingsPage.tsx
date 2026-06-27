@@ -14,6 +14,7 @@ export function SettingsPage() {
     gemini_api_key: "",
     gemini_model: "gemini-2.5-flash",
     cron_schedule: "0 */4 * * *",
+    trash_retention_days: 30,
     active_companies: ""
   })
   const [loading, setLoading] = useState(true)
@@ -33,6 +34,20 @@ export function SettingsPage() {
 
   const refreshResumes = () => {
     api.get("/api/resumes").then(res => setResumes(res.data.resumes || []))
+  }
+
+  const [cleaningTrash, setCleaningTrash] = useState(false)
+  
+  const handleCleanTrash = async () => {
+    if (!confirm("Are you sure you want to permanently delete all items in the trash?")) return
+    setCleaningTrash(true)
+    try {
+      const res = await api.delete("/api/jobs/trash/empty")
+      toast(`Deleted ${res.data.deleted} items from trash`, "success")
+    } catch {
+      toast("Error emptying trash", "error")
+    }
+    setCleaningTrash(false)
   }
 
   const handleDeleteResume = async (name: string) => {
@@ -56,6 +71,7 @@ export function SettingsPage() {
         gemini_api_key: settings.gemini_api_key,
         gemini_model: settings.gemini_model,
         cron_schedule: settings.cron_schedule,
+        trash_retention_days: Number(settings.trash_retention_days),
       })
       toast("Settings saved successfully!", "success")
     } catch (e) {
@@ -214,6 +230,25 @@ export function SettingsPage() {
             className="w-full bg-black/40 border border-white/10 rounded-lg px-4 py-2 text-white focus:outline-none focus:border-blue-500 font-mono"
             placeholder="0 */4 * * *"
           />
+        </div>
+        
+        <div>
+          <label className="block text-sm font-medium text-zinc-400 mb-1">Trash Retention (Days)</label>
+          <div className="flex items-center gap-3">
+            <input 
+              type="number" 
+              value={settings.trash_retention_days ?? 30} 
+              onChange={e => setSettings({...settings, trash_retention_days: e.target.value})}
+              className="flex-1 bg-black/40 border border-white/10 rounded-lg px-4 py-2 text-white focus:outline-none focus:border-blue-500 font-mono"
+              placeholder="30"
+              min="0"
+            />
+            <Button onClick={handleCleanTrash} disabled={cleaningTrash} className="bg-red-600/20 text-red-400 hover:bg-red-600/30 border border-red-500/30 shrink-0">
+              <Trash2 className="w-4 h-4 mr-2" />
+              {cleaningTrash ? "Cleaning..." : "Clean Trash Now"}
+            </Button>
+          </div>
+          <p className="text-xs text-zinc-500 mt-1">Jobs in the Trash state older than this will be permanently deleted during cron scrapes. Set to 0 to disable auto-cleanup.</p>
         </div>
         
         <div className="pt-4 flex justify-end">

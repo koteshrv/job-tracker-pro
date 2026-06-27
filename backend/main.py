@@ -2,7 +2,10 @@ from fastapi import FastAPI, Depends, HTTPException, BackgroundTasks, UploadFile
 import shutil
 from pathlib import Path
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import JSONResponse
+from fastapi.responses import JSONResponse, FileResponse
+import subprocess
+import tempfile
+import os
 from starlette.middleware.base import BaseHTTPMiddleware
 from sqlalchemy.orm import Session
 from typing import List
@@ -113,6 +116,11 @@ def remove_job(job_id: int, db: Session = Depends(get_db)):
         raise HTTPException(status_code=404, detail="Job not found")
     return {"deleted": 1}
 
+@app.delete("/api/jobs/trash/empty")
+def empty_trash(db: Session = Depends(get_db)):
+    count = crud.empty_trash(db)
+    return {"deleted": count}
+
 @app.put("/api/jobs/{job_id}", response_model=schemas.Job)
 def update_job(job_id: int, job_update: schemas.JobUpdate, db: Session = Depends(get_db)):
     db_job = crud.update_job_status(db, job_id, job_update)
@@ -209,3 +217,40 @@ def generate_resume_for_job(job_id: int, resume: str = None, db: Session = Depen
 
     crud.update_job_status(db, job_id, schemas.JobUpdate(tailored_resume=resume_text))
     return {"tailored_resume": resume_text}
+
+@app.get("/api/jobs/{job_id}/resume/pdf")
+def get_resume_pdf(job_id: int, db: Session = Depends(get_db)):
+    db_job = crud.get_job(db, job_id)
+    if not db_job or not db_job.tailored_resume:
+        raise HTTPException(status_code=404, detail="Tailored resume not found for this job")
+
+    with tempfile.TemporaryDirectory() as tmpdir:
+        tex_path = Path(tmpdir) / "resume.tex"
+        tex_path.write_text(db_job.tailored_resume)
+        
+        try:
+            # Run pdflatex twice for references, though usually once is enough for simple resumes
+            subprocess.run(
+                ["pdflatex", "-interaction=nonstopmode", "resume.tex"],
+                cwd=tmpdir,
+                check=True,
+                stdout=subprocess.PIPE,
+                stderr=subprocess.PIPE
+            )
+        except subprocess.CalledProcessError as e:
+            logger.error(f"LaTeX compilation failed: {e.stdout.decode()} {e.stderr.decode()}")
+            raise HTTPException(status_code=500, detail="Failed to compile PDF from LaTeX")
+        
+        pdf_path = Path(tmpdir) / "resume.pdf"
+        if not pdf_path.exists():
+            raise HTTPException(status_code=500, detail="PDF file was not generated")
+            
+        # Copy the pdf out of the tempdir so it persists for FileResponse
+        out_path = Path("/tmp") / f"resume_{job_id}.pdf"
+        shutil.copy(pdf_path, out_path)
+        
+    return FileResponse(
+        path=out_path,
+        media_type="application/pdf",
+        filename=f"{db_job.company}_Resume.pdf"
+    )

@@ -47,7 +47,7 @@ export function HistoryPage() {
             <p className="text-sm text-zinc-400">Logs from background cron executions</p>
           </div>
           <button
-            onClick={fetchLogs}
+            onClick={() => fetchLogs()}
             disabled={refreshing}
             className="flex items-center gap-2 px-4 py-2 rounded-full text-xs font-semibold bg-zinc-800/50 text-zinc-300 border border-white/5 hover:bg-zinc-800 transition-all disabled:opacity-50"
           >
