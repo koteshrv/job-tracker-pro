@@ -18,7 +18,7 @@ export function Login() {
     try {
       const res = await api.post("/api/login", { username, password })
       setToken(res.data.token)
-      navigate("/app/pipeline", { replace: true })
+      navigate("/app/applications", { replace: true })
     } catch (err: any) {
       setError(err.response?.data?.detail || "Login failed. Check your credentials.")
     }

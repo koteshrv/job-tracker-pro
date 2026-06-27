@@ -8,7 +8,7 @@ export function LandingPage() {
   const [terminalText, setTerminalText] = useState("")
 
   const handleEnter = () => {
-    navigate("/app/pipeline")
+    navigate("/app/applications")
   }
 
   useEffect(() => {

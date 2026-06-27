@@ -10,7 +10,7 @@ import { Zap, LayoutDashboard, Settings, History, LineChart, LogOut } from "luci
 import type { ReactNode } from "react"
 
 const NAV = [
-  { to: "/app/pipeline", label: "Job Applications", title: "Application Dashboard", icon: LayoutDashboard },
+  { to: "/app/applications", label: "Job Applications", title: "Application Dashboard", icon: LayoutDashboard },
   { to: "/app/analytics", label: "Analytics", title: "Analytics", icon: LineChart },
   { to: "/app/history", label: "Run History", title: "Run History", icon: History },
   { to: "/app/settings", label: "Settings", title: "Settings", icon: Settings },
@@ -126,12 +126,12 @@ function App() {
       <Route path="/" element={<LandingPage />} />
       <Route path="/login" element={<Login />} />
       <Route path="/app" element={<RequireAuth><Layout /></RequireAuth>}>
-        <Route index element={<Navigate to="/app/pipeline" replace />} />
-        <Route path="pipeline" element={<div className="flex-1 overflow-x-auto overflow-y-hidden p-8 custom-scrollbar"><KanbanBoard /></div>} />
+        <Route index element={<Navigate to="/app/applications" replace />} />
+        <Route path="applications" element={<div className="flex-1 overflow-x-auto overflow-y-hidden p-8 custom-scrollbar"><KanbanBoard /></div>} />
         <Route path="analytics" element={<div className="flex-1 overflow-y-auto custom-scrollbar"><AnalyticsPage /></div>} />
         <Route path="history" element={<div className="flex-1 overflow-y-auto custom-scrollbar"><HistoryPage /></div>} />
         <Route path="settings" element={<div className="flex-1 overflow-y-auto custom-scrollbar"><SettingsPage /></div>} />
-        <Route path="*" element={<Navigate to="/app/pipeline" replace />} />
+        <Route path="*" element={<Navigate to="/app/applications" replace />} />
       </Route>
       <Route path="*" element={<Navigate to="/" replace />} />
     </Routes>

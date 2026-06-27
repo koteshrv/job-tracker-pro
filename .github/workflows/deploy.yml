@@ -40,7 +40,7 @@ jobs:
           VITE_DEMO_MODE: "true"
           # Set base to your GitHub Pages path e.g. /career-agent/
           # Change this to match your repo name if different
-          VITE_BASE_URL: "/career-agent/"
+          VITE_BASE_URL: "/"
         run: npm run build
 
       # GitHub Pages can't handle client-side routing without this:
