@@ -18,7 +18,7 @@ export function Login() {
     try {
       const res = await api.post("/api/login", { username, password })
       setToken(res.data.token)
-      navigate("/pipeline", { replace: true })
+      navigate("/app/pipeline", { replace: true })
     } catch (err: any) {
       setError(err.response?.data?.detail || "Login failed. Check your credentials.")
     }
@@ -32,7 +32,7 @@ export function Login() {
           <div className="w-12 h-12 rounded-xl bg-gradient-to-br from-blue-600 via-indigo-600 to-purple-700 flex items-center justify-center shadow-[0_0_20px_rgba(79,70,229,0.3)] mb-3">
             <Sparkles className="w-6 h-6 text-white" />
           </div>
-          <h1 className="text-xl font-bold text-white">Job Tracker Pro</h1>
+          <h1 className="text-xl font-bold text-white">CareerAgent</h1>
           <p className="text-xs text-zinc-500 uppercase tracking-widest font-semibold">Application Tracker</p>
         </div>
 
