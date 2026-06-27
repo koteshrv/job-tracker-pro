@@ -173,7 +173,7 @@ export function KanbanBoard() {
         }
       }}
     >
-      <Card className={`bg-zinc-950/90 border-white/5 hover:border-white/20 hover:bg-zinc-900 cursor-pointer transition-colors shadow-lg ${snapshot.isDragging ? 'ring-2 ring-indigo-500/50 shadow-indigo-500/20 z-50' : ''} ${isSelected ? 'ring-2 ring-blue-500/60' : ''}`}>
+      <Card className={`bg-zinc-950/80 backdrop-blur-md border-white/5 hover:border-white/20 hover:bg-zinc-900 cursor-pointer transition-all duration-300 hover:-translate-y-1 shadow-lg hover:shadow-xl ${snapshot.isDragging ? 'ring-2 ring-indigo-500/50 shadow-indigo-500/20 z-50 -translate-y-2 scale-105' : ''} ${isSelected ? 'ring-2 ring-blue-500/60' : ''}`}>
         <CardContent className="p-4">
           <div className="flex justify-between items-start gap-3 mb-2">
             <div className="flex items-center gap-2 text-zinc-300 font-medium text-sm truncate flex-1">

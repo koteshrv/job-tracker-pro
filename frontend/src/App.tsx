@@ -10,7 +10,7 @@ import { Sparkles, LayoutDashboard, Settings, History, LineChart, LogOut } from 
 import type { ReactNode } from "react"
 
 const NAV = [
-  { to: "/app/pipeline", label: "Job Pipeline", title: "Pipeline Dashboard", icon: LayoutDashboard },
+  { to: "/app/pipeline", label: "Job Applications", title: "Application Dashboard", icon: LayoutDashboard },
   { to: "/app/analytics", label: "Analytics", title: "Analytics", icon: LineChart },
   { to: "/app/history", label: "Run History", title: "Run History", icon: History },
   { to: "/app/settings", label: "Settings", title: "Settings", icon: Settings },
@@ -59,13 +59,13 @@ function Layout() {
           <div className="h-20 flex items-center px-6 border-b border-white/5">
             <div className="flex items-center gap-3">
               <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-blue-600 via-indigo-600 to-purple-700 flex items-center justify-center shadow-[0_0_20px_rgba(79,70,229,0.3)]">
-                <Sparkles className="w-5 h-5 text-white" />
+                <Sparkles className="w-5 h-5 text-white animate-pulse" />
               </div>
               <div>
               <h1 className="text-lg font-bold bg-clip-text text-transparent bg-gradient-to-r from-white to-zinc-400 tracking-tight">
                 CareerAgent
               </h1>
-              <p className="text-[10px] text-zinc-500 uppercase tracking-widest font-semibold">Application Tracker</p>
+              <p className="text-[10px] text-zinc-500 uppercase tracking-widest font-semibold">AI Career Platform</p>
             </div>
             </div>
           </div>
