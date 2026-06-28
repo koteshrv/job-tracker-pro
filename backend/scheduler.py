@@ -1,4 +1,5 @@
 import logging
+import json
 from apscheduler.schedulers.background import BackgroundScheduler
 from apscheduler.triggers.cron import CronTrigger
 
@@ -23,8 +24,13 @@ def _scheduled_scrape():
             if deleted_trash > 0:
                 logger.info(f"Cleaned up {deleted_trash} old trash items.")
                 
-        new_jobs = run_scraper(db)
-        crud.update_scraper_log(db, log.id, jobs_found=len(new_jobs), status="SUCCESS")
+        # Clean old scraper logs (14 days)
+        deleted_logs = crud.delete_old_scraper_logs(db, 14)
+        if deleted_logs > 0:
+            logger.info(f"Cleaned up {deleted_logs} old scraper logs.")
+                
+        new_jobs, company_logs = run_scraper(db)
+        crud.update_scraper_log(db, log.id, jobs_found=len(new_jobs), status="SUCCESS", detailed_logs=json.dumps(company_logs))
         logger.info(f"Scheduled scrape complete. Found {len(new_jobs)} new jobs.")
     except Exception as e:
         crud.update_scraper_log(db, log.id, status="FAILED", error_message=str(e))

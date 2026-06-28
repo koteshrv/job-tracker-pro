@@ -55,7 +55,7 @@ class SettingsBase(BaseModel):
     telegram_chat_id: Optional[str] = None
     telegram_bot_token: Optional[str] = None
     gemini_api_key: Optional[str] = None
-    gemini_model: Optional[str] = "gemini-2.5-flash"
+    gemini_model: Optional[str] = "gemini-2.5-flash, gemini-flash-latest, gemini-2.5-pro"
     cron_schedule: Optional[str] = "0 */4 * * *"
     trash_retention_days: Optional[int] = 30
     active_companies: Optional[str] = None
@@ -83,7 +83,9 @@ class ScraperLogBase(BaseModel):
     jobs_found: int
     status: str
     error_message: Optional[str] = None
-    trigger_source: Optional[str] = "MANUAL"
+    trigger_source: str = "MANUAL"
+    detailed_logs: Optional[str] = None
+    raw_logs: Optional[str] = None
 
 class ScraperLog(ScraperLogBase):
     id: int

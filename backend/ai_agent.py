@@ -8,6 +8,7 @@ from pathlib import Path
 from dotenv import load_dotenv
 from pydantic import BaseModel
 from fastapi import HTTPException
+import time
 
 try:
     from ollama import Client as OllamaClient
@@ -18,11 +19,60 @@ load_dotenv()
 
 logger = logging.getLogger(__name__)
 
-DEFAULT_GEMINI_MODEL = "gemini-2.5-flash"
-ENV_API_KEY = os.getenv("GEMINI_API_KEY")
+# --- DB-backed rate limit state ---
+# Stores rate_limited_until (unix timestamp) inside model_telemetry JSON per model.
+# Survives server restarts unlike an in-memory dict.
 
-# Ordered fallback chain tried when the chosen model errors (rate limit, overload, etc.).
-FALLBACK_MODELS = ["gemini-2.5-flash", "gemini-flash-latest", "gemini-2.0-flash", "gemini-2.0-flash-lite"]
+def _is_rate_limited(model: str) -> bool:
+    """Check DB to see if this model is still in its rate-limit cooldown window."""
+    from .database import SessionLocal
+    from . import models as _models
+    db = SessionLocal()
+    try:
+        settings = db.query(_models.Settings).first()
+        if settings and settings.model_telemetry:
+            telemetry = json.loads(settings.model_telemetry)
+            entry = telemetry.get(model, {})
+            until = entry.get("rate_limited_until", 0)
+            if time.time() < until:
+                remaining = int(until - time.time())
+                logger.info(f"[RateLimit] {model} is DB-rate-limited for {remaining}s more.")
+                return True
+    except Exception:
+        pass
+    finally:
+        db.close()
+    return False
+
+def _set_rate_limit(model: str, seconds: int = 60):
+    """Persist a rate-limit cooldown for this model in DB model_telemetry."""
+    from .database import SessionLocal
+    from . import models as _models
+    db = SessionLocal()
+    try:
+        settings = db.query(_models.Settings).first()
+        if settings:
+            telemetry = {}
+            if settings.model_telemetry:
+                try:
+                    telemetry = json.loads(settings.model_telemetry)
+                except Exception:
+                    telemetry = {}
+            if model not in telemetry:
+                telemetry[model] = {}
+            telemetry[model]["rate_limited_until"] = time.time() + seconds
+            settings.model_telemetry = json.dumps(telemetry)
+            db.commit()
+            logger.info(f"[RateLimit] {model} marked rate-limited in DB for {seconds}s.")
+    except Exception as e:
+        logger.error(f"Failed to persist rate limit for {model}: {e}")
+    finally:
+        db.close()
+
+# Emergency fallback used ONLY if the DB is completely unreachable at runtime.
+# This is NOT the intended configuration path — use the Settings UI to set your model chain.
+_EMERGENCY_FALLBACK_MODEL = "gemini-3.1-flash-lite"
+ENV_API_KEY = os.getenv("GEMINI_API_KEY")
 
 # Substrings that indicate retrying a different model won't help (auth/config issues).
 _FATAL_ERROR_HINTS = ("api key not valid", "api_key_invalid", "permission denied", "unauthenticated")
@@ -131,19 +181,53 @@ def record_token_usage(model_name: str, prompt_tokens: int, candidate_tokens: in
 def _generate(prompt: str, api_key: str = None, model_name: str = None) -> str:
     """Run a prompt through Gemini, falling back to lower models on error."""
     resolved_key = api_key or ENV_API_KEY
+    resolved_model = model_name
+    
+    from .database import SessionLocal
+    from . import models
+    db = SessionLocal()
+    try:
+        settings = db.query(models.Settings).first()
+        if settings:
+            if not resolved_key and settings.gemini_api_key:
+                from .crypto import decrypt_value
+                decrypted = decrypt_value(settings.gemini_api_key)
+                if decrypted:
+                    resolved_key = decrypted
+            if not resolved_model and settings.gemini_model:
+                resolved_model = settings.gemini_model
+    except Exception:
+        pass
+    finally:
+        db.close()
+
     if not resolved_key:
         return "Error: Gemini API key is not configured. Add it in Settings or set GEMINI_API_KEY in the backend environment."
 
-    # Parse comma-separated models from settings, then append system fallbacks
-    user_models = [m.strip() for m in (model_name or "").split(",") if m.strip()]
+    # Build model chain exclusively from DB (what the user set in Settings UI).
+    # If DB was unreachable, fall back to a single emergency model — NOT a hardcoded list.
     chain = []
-    for m in [*user_models, DEFAULT_GEMINI_MODEL, *FALLBACK_MODELS]:
-        if m and m not in chain:
-            chain.append(m)
+    raw_models = resolved_model if resolved_model else _EMERGENCY_FALLBACK_MODEL
+    for m in raw_models.split(","):
+        clean_m = m.strip()
+        if clean_m and clean_m not in chain:
+            chain.append(clean_m)
+            
+    if not chain:
+        chain.append(_EMERGENCY_FALLBACK_MODEL)
+    
+    if not resolved_model:
+        logger.warning(f"[AI] DB model chain unavailable. Using emergency fallback: {chain}")
+    else:
+        logger.info(f"[AI] Model chain from Settings: {chain}")
 
     client = genai.Client(api_key=resolved_key)
     last_err = ""
     for model in chain:
+        if _is_rate_limited(model):
+            logger.info(f"Skipping {model} due to recent 429 Rate Limit.")
+            continue
+            
         try:
             response = client.models.generate_content(model=model, contents=prompt)
             # Record token metrics
@@ -157,11 +241,24 @@ def _generate(prompt: str, api_key: str = None, model_name: str = None) -> str:
                 
         except Exception as e:
             err_msg = str(e)
-            logger.warning(f"Gemini generation failed for model {model}: {err_msg}")
+            logger.warning(f"Triggering fallback — Model {model} failed: {err_msg}")
             last_err = err_msg
+            if "429" in err_msg or "RESOURCE_EXHAUSTED" in err_msg:
+                # Default 60s cooldown
+                cooldown = 60
+                # Try to parse "retry in Xs" from error
+                import re
+                match = re.search(r"retry in (\d+)(?:\.\d+)?s", err_msg)
+                if match:
+                    cooldown = int(match.group(1)) + 2 # Add 2s buffer
+                _set_rate_limit(model, cooldown)
+                
             if any(h in err_msg.lower() for h in _FATAL_ERROR_HINTS):
                 break  # auth/config issue — fallback won't help
                 
+    if not last_err:
+        last_err = "All models were skipped because they are currently in a cooldown period (penalty box) from recent rate limits."
+        
     return f"Error generating content (all models failed). Last error: {last_err}"
 
 def _generate_cloud_private(prompt: str, settings: any) -> str:
@@ -292,7 +389,12 @@ def generate_tailored_resume(job_title: str, company: str, location: str = "", d
 
     jd_context = f"\n\nJob Description Context:\n---\n{description}\n---\n" if description else ""
 
-    escape_directive = "\nCRITICAL LATEX REQUIREMENT:\nYou MUST escape ALL special LaTeX characters in the content you generate. Specifically, you must replace '&' with '\&', '%' with '\%', '$' with '\$', and '_' with '\_'. Failure to escape these characters will cause the compiler to crash!" if is_tex else ""
+    escape_directive = (
+        "\nCRITICAL LATEX REQUIREMENT:\n"
+        "You MUST escape ALL special LaTeX characters. Replace "
+        "'&' with '\\&', '%' with '\\%', '$' with '\\$', '_' with '\\_'. "
+        "Failure to escape these will crash the compiler!"
+    ) if is_tex else ""
 
     # Inject user guidelines if configured
     guidelines = _get_custom_guidelines()
@@ -397,8 +499,7 @@ Raw Webpage Text:
 {raw_text[:12000]}
 ---
 """
-    # Hardcode gemini-2.5-flash for this utility task to be fast and save limits
-    result = _generate(prompt, api_key, "gemini-2.5-flash")
+    result = _generate(prompt, api_key, None)
     if result.startswith("Error") or not result.strip():
         return raw_text  # Fallback to raw text if AI fails
         
@@ -411,3 +512,79 @@ Raw Webpage Text:
         clean = "\n".join(lines).strip()
         
     return clean
+
+
+
+def filter_job_links(jobs: list, keyword: str, api_key: str = None) -> tuple[list, list]:
+    """Uses Gemini to filter out false positive links. Returns (valid_jobs, rejected_jobs)."""
+    if not jobs:
+        return [], []
+    
+    # Safety cap to avoid exceeding token limits.
+    # At ~50 tokens/link, 2000 links ≈ 100K tokens — well within gemini-2.5-flash's 250K TPM.
+    # The old 400 cap was silently dropping entire companies from the AI filter!
+    MAX_JOBS = 2000
+    if len(jobs) > MAX_JOBS:
+        logger.warning(f"Capping AI input from {len(jobs)} to {MAX_JOBS} candidates to stay within token limits.")
+        jobs = jobs[:MAX_JOBS]
+        
+    import json
+    prompt = f"""
+You are an expert technical recruiter parsing scraped web links.
+Your ONLY job is to filter a list of links and return the IDs of actual, individual job postings.
+
+CRITICAL RULES for REJECTING links (False Positives):
+1. REJECT any generic site navigation links: "Privacy", "Terms", "FAQ", "Login", "Register", "Contact Us", "About", "Home", "Accessibility", "Cookie Policy".
+2. REJECT category or search-result pages that don't point to a single specific job (e.g., URLs ending in `#footer` or generic search endpoints like `jobsearch?jk=software`).
+3. REJECT blog posts, news articles, investor relations, press releases, and alumni networks.
+4. REJECT any link where the title does not look like a specific job role.
+
+CRITICAL RULES for ACCEPTING links (True Positives):
+1. ACCEPT links that point to a SPECIFIC job description (e.g., "Software Engineer - Backend", "Data Analyst").
+2. We are specifically searching for roles related to the keyword: '{keyword}', but you may accept any legitimate technical/corporate job posting.
+
+Here is the JSON list of links:
+{json.dumps([{"id": i, "company": j.get("company", "Unknown"), "title": j["title"], "url": j.get("url", j.get("href", ""))} for i, j in enumerate(jobs)], indent=2)}
+
+Return a JSON array containing ONLY the integer IDs of the valid job links.
+For example: [0, 2, 5]
+Do not return markdown fences. Just the raw JSON array.
+"""
+    try:
+        result = _generate(prompt, api_key, None)
+        
+        # --- Diagnostic Dump ---
+        try:
+            dump_dir = Path(__file__).parent / "dump"
+            dump_dir.mkdir(exist_ok=True)
+            import time
+            ts = int(time.time())
+            with open(dump_dir / f"ai_input_{ts}.json", "w") as f:
+                json.dump(jobs, f, indent=2)
+            with open(dump_dir / f"ai_output_{ts}.txt", "w") as f:
+                f.write(str(result))
+        except Exception as dump_e:
+            logger.error(f"Failed to write AI diagnostic dump: {dump_e}")
+        # -----------------------
+
+        if not result or result.startswith("Error"):
+            return jobs, []
+            
+        clean = result.strip()
+        if clean.startswith("```"):
+            lines = clean.split("\n")
+            if lines[0].startswith("```json"): lines = lines[1:]
+            elif lines[0].startswith("```"): lines = lines[1:]
+            if lines[-1].startswith("```"): lines = lines[:-1]
+            clean = "\n".join(lines).strip()
+            
+        valid_ids = json.loads(clean)
+        if isinstance(valid_ids, list):
+            valid_set = set(v for v in valid_ids if isinstance(v, int) and 0 <= v < len(jobs))
+            valid_jobs = [jobs[i] for i in range(len(jobs)) if i in valid_set]
+            rejected_jobs = [jobs[i] for i in range(len(jobs)) if i not in valid_set]
+            return valid_jobs, rejected_jobs
+    except Exception as e:
+        logger.error(f"AI filtering failed: {e}")
+        
+    return jobs, []

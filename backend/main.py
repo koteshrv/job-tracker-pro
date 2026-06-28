@@ -1,4 +1,6 @@
-from fastapi import FastAPI, Depends, HTTPException, BackgroundTasks, UploadFile, File, Form
+from fastapi import FastAPI, Depends, HTTPException, BackgroundTasks, UploadFile, File, Form, WebSocket, WebSocketDisconnect
+import asyncio
+from collections import deque
 import shutil
 from pathlib import Path
 from pydantic import BaseModel
@@ -12,21 +14,108 @@ from starlette.middleware.base import BaseHTTPMiddleware
 from sqlalchemy.orm import Session
 from typing import List
 import logging
+import logging.handlers
+
+# Enterprise Grade Logging Setup
+# Set LOG_LEVEL=DEBUG (or VERBOSE) in environment for verbose output during development.
+_raw_level = os.environ.get("LOG_LEVEL", "INFO").upper()
+_log_level = logging.DEBUG if _raw_level in ("DEBUG", "VERBOSE") else logging.INFO
+
+root_logger = logging.getLogger()
+root_logger.setLevel(_log_level)
+root_logger.handlers = [] # Clear default handlers
+
+log_format = '%(asctime)s | %(levelname)-8s | [%(name)s:%(lineno)d] | %(message)s'
+formatter = logging.Formatter(log_format)
+
+# Console Output
+console_handler = logging.StreamHandler()
+console_handler.setFormatter(formatter)
+root_logger.addHandler(console_handler)
+
+# Rotating File Output (Max 10MB, Keep 5 backups)
+file_handler = logging.handlers.RotatingFileHandler('backend.log', maxBytes=10*1024*1024, backupCount=5)
+file_handler.setFormatter(formatter)
+root_logger.addHandler(file_handler)
+
+if _log_level == logging.DEBUG:
+    logging.getLogger("httpx").setLevel(logging.INFO)          # suppress httpx byte-level noise
+    logging.getLogger("google_genai").setLevel(logging.INFO)   # suppress SDK internal noise
+    logging.getLogger("uvicorn.access").setLevel(logging.WARNING)  # suppress per-request HTTP logs
+
+
 
 from . import models, schemas, crud, scheduler, ai_agent, auth
 from .database import engine, get_db
+import json
 from .scraper_core import run_scraper, load_targets, fetch_job_description, record_job
 from .ai_agent import generate_cover_letter, generate_tailored_resume
 
 logger = logging.getLogger(__name__)
+
+class ConnectionManager:
+    def __init__(self):
+        self.active_connections: List[WebSocket] = []
+        self.log_buffer = deque(maxlen=100)
+
+    async def connect(self, websocket: WebSocket):
+        await websocket.accept()
+        self.active_connections.append(websocket)
+        for msg in self.log_buffer:
+            await websocket.send_text(msg)
+
+    def disconnect(self, websocket: WebSocket):
+        if websocket in self.active_connections:
+            self.active_connections.remove(websocket)
+
+    async def broadcast(self, message: str):
+        self.log_buffer.append(message)
+        for connection in list(self.active_connections):
+            try:
+                await connection.send_text(message)
+            except Exception:
+                self.disconnect(connection)
+
+manager = ConnectionManager()
+
+class WebSocketLogHandler(logging.Handler):
+    def __init__(self, manager: ConnectionManager, loop: asyncio.AbstractEventLoop):
+        super().__init__()
+        self.manager = manager
+        self.loop = loop
+        self.formatter = logging.Formatter('%(asctime)s - %(levelname)s - %(name)s - %(message)s')
+
+    def emit(self, record):
+        try:
+            msg = self.format(record)
+            if self.loop.is_running():
+                asyncio.run_coroutine_threadsafe(self.manager.broadcast(msg), self.loop)
+        except Exception:
+            pass
+
+class RunLogCaptureHandler(logging.Handler):
+    def __init__(self):
+        super().__init__()
+        self.logs = []
+        self.formatter = logging.Formatter('%(asctime)s - %(levelname)s - %(name)s - %(message)s')
+
+    def emit(self, record):
+        try:
+            self.logs.append(self.format(record))
+        except Exception:
+            pass
 
 # Create tables if they don't exist
 models.Base.metadata.create_all(bind=engine)
 
 app = FastAPI(title="Job Scraper ATS API")
 
+@app.get("/healthz")
+def health_check():
+    return {"status": "ok"}
+
 # Paths reachable without a valid auth token.
-PUBLIC_PATHS = {"/api/login"}
+PUBLIC_PATHS = {"/api/login", "/api/ws/logs", "/healthz"}
 
 class AuthMiddleware(BaseHTTPMiddleware):
     async def dispatch(self, request, call_next):
@@ -58,6 +147,21 @@ def login(creds: schemas.LoginRequest):
 
 @app.on_event("startup")
 def _start_scheduler():
+    try:
+        loop = asyncio.get_running_loop()
+        ws_handler = WebSocketLogHandler(manager, loop)
+        ws_handler.setLevel(logging.INFO)
+        root_logger = logging.getLogger()
+        root_logger.addHandler(ws_handler)
+        
+        # Also add a standard console handler so we don't lose stdout logs
+        console_handler = logging.StreamHandler()
+        console_handler.setLevel(logging.INFO)
+        formatter = logging.Formatter('%(asctime)s - %(levelname)s - %(name)s - %(message)s')
+        console_handler.setFormatter(formatter)
+        root_logger.addHandler(console_handler)
+    except Exception as e:
+        logger.error(f"Failed to attach WS logger: {e}")
     # Clean up any RUNNING logs orphaned by a previous crash/restart.
     db = next(get_db())
     try:
@@ -79,18 +183,42 @@ def _stop_scheduler():
 def bg_scrape_task(db: Session):
     # Log a RUNNING entry immediately so it shows up in history right away.
     log = crud.create_scraper_log(db, schemas.ScraperLogBase(jobs_found=0, status="RUNNING", trigger_source="MANUAL"))
+    
+    capture_handler = RunLogCaptureHandler()
+    capture_handler.setLevel(logging.INFO)
+    logging.getLogger().addHandler(capture_handler)
+    
     try:
-        new_jobs = run_scraper(db)
-        crud.update_scraper_log(db, log.id, jobs_found=len(new_jobs), status="SUCCESS")
+        # Clean old scraper logs (14 days)
+        deleted_logs = crud.delete_old_scraper_logs(db, 14)
+        if deleted_logs > 0:
+            logger.info(f"Cleaned up {deleted_logs} old scraper logs.")
+            
+        new_jobs, company_logs = run_scraper(db)
+        
+        raw_logs_str = "\n".join(capture_handler.logs)
+        crud.update_scraper_log(db, log.id, jobs_found=len(new_jobs), status="SUCCESS", detailed_logs=json.dumps(company_logs), raw_logs=raw_logs_str)
         logger.info(f"Background scrape complete! Found {len(new_jobs)} new jobs.")
     except Exception as e:
-        crud.update_scraper_log(db, log.id, status="FAILED", error_message=str(e))
+        raw_logs_str = "\n".join(capture_handler.logs)
+        crud.update_scraper_log(db, log.id, status="FAILED", error_message=str(e), raw_logs=raw_logs_str)
         logger.error(f"Background scrape failed: {e}")
+    finally:
+        logging.getLogger().removeHandler(capture_handler)
 
 @app.post("/api/run-scraper")
 def trigger_scraper(background_tasks: BackgroundTasks, db: Session = Depends(get_db)):
     background_tasks.add_task(bg_scrape_task, db)
-    return {"message": "Scraper job started in the background."}
+    return {"message": "Scraper started in background"}
+
+@app.websocket("/api/ws/logs")
+async def websocket_logs(websocket: WebSocket):
+    await manager.connect(websocket)
+    try:
+        while True:
+            await websocket.receive_text()
+    except WebSocketDisconnect:
+        manager.disconnect(websocket)
 
 @app.get("/api/jobs", response_model=List[schemas.Job])
 def read_jobs(skip: int = 0, limit: int = 100, db: Session = Depends(get_db)):

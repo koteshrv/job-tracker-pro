@@ -24,3 +24,4 @@ google-genai==2.10.0
 apscheduler==3.11.2
 pyvirtualdisplay==3.0
 fake-useragent==1.5.1
+beautifulsoup4==4.15.0

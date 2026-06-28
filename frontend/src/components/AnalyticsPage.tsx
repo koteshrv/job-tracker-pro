@@ -16,17 +16,24 @@ import { Cpu, TrendingUp, Filter } from "lucide-react"
  */
 function getModelDailyLimit(model: string): number {
   const m = (model || "").toLowerCase()
-  // Pro models — most restrictive
+  // 2.5 Pro / 3.1 Pro → 100 RPD (free tier, June 2026)
+  if (m.includes("2.5-pro") || m.includes("3.1-pro")) return 100
+  // Other Pro → 50 RPD (conservative fallback)
   if (m.includes("pro")) return 50
-  // Aliases that resolve to current latest flash (≥ 2.5 family → 500/day)
-  if (m === "gemini-flash-latest" || m.endsWith("-flash-latest")) return 500
-  // Newer flash generations: 2.5, 3.x, experimental/preview
-  if (m.includes("2.5") || m.includes("3.") || m.includes("preview") || m.includes("exp")) return 500
-  // Older flash: 1.5-flash and 2.0-flash → 1500/day
-  if (m.includes("1.5") || m.includes("2.0")) return 1500
-  // Unknown — return -1 so UI can show '?'
-  return -1
+  // gemini-flash-latest alias → resolves to 3.5-flash → 1500 RPD
+  if (m === "gemini-flash-latest" || m.includes("3.5") || m.includes("3-flash") || m.includes("3.1-flash")) return 1500
+  // 3 Flash (Preview) → 1500 RPD
+  if (m.includes("3.") && m.includes("flash")) return 1500
+  // Gemini 2.5 Flash → 250 RPD (per user's confirmed table)
+  if (m.includes("2.5-flash") || m.includes("2.5flash")) return 250
+  // Gemini 2.0 Flash → RETIRED June 2026, 0 RPD
+  if (m.includes("2.0")) return 0
+  // Gemini 1.5 → 404 on v1beta, effectively unusable
+  if (m.includes("1.5")) return 0
+  // Unknown new model → assume standard free tier
+  return 1500
 }
+
 
 export function AnalyticsPage() {
   const [jobs, setJobs] = useState<any[]>([])

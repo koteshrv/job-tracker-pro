@@ -29,7 +29,7 @@ class Settings(Base):
     telegram_chat_id = Column(String, nullable=True)
     telegram_bot_token = Column(String, nullable=True) # Encrypted
     gemini_api_key = Column(String, nullable=True) # Encrypted
-    gemini_model = Column(String, default="gemini-2.5-flash")
+    gemini_model = Column(String, default="gemini-2.5-flash, gemini-flash-latest, gemini-2.5-pro")
     cron_schedule = Column(String, default="0 */4 * * *")
     trash_retention_days = Column(Integer, default=30)
     active_companies = Column(String, nullable=True) # JSON array of active companies
@@ -58,3 +58,5 @@ class ScraperLog(Base):
     status = Column(String) # "SUCCESS", "FAILED"
     error_message = Column(Text, nullable=True)
     trigger_source = Column(String, default="MANUAL") # "MANUAL", "CRON"
+    detailed_logs = Column(Text, nullable=True) # JSON string of company logs
+    raw_logs = Column(Text, nullable=True) # Full console output for this runutcomes

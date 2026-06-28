@@ -2,7 +2,7 @@ import { useState, useEffect } from "react"
 import { api } from "@/lib/api"
 import { Button } from "@/components/ui/button"
 import { useToast } from "./Toast"
-import { X, Play, Check } from "lucide-react"
+import { X, Check } from "lucide-react"
 
 export function ScrapeConfig() {
   const { toast } = useToast()
@@ -11,7 +11,6 @@ export function ScrapeConfig() {
   const [activeCompanies, setActiveCompanies] = useState<string[]>([])
   const [keywordInput, setKeywordInput] = useState("")
   const [saving, setSaving] = useState(false)
-  const [running, setRunning] = useState(false)
 
   useEffect(() => {
     api.get("/api/companies").then(res => setCompanies(res.data.companies || []))
@@ -67,32 +66,11 @@ export function ScrapeConfig() {
     setSaving(false)
   }
 
-  const handleRunNow = async () => {
-    setRunning(true)
-    try {
-      await api.post("/api/run-scraper")
-      toast("Scraper started in the background. Check Run History for results.", "success")
-    } catch {
-      toast("Failed to start scraper", "error")
-    }
-    setTimeout(() => setRunning(false), 2000)
-  }
-
   return (
     <div className="bg-[#12141a] rounded-2xl border border-white/5 p-6 shadow-xl space-y-6">
-      <div className="flex items-center justify-between">
-        <div>
-          <h3 className="text-lg font-bold text-white">Scrape Configuration</h3>
-          <p className="text-sm text-zinc-400 mt-1">Keywords and companies the scraper targets. Runs automatically on your cron schedule.</p>
-        </div>
-        <Button
-          onClick={handleRunNow}
-          disabled={running}
-          className="bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-500 hover:to-indigo-500 text-white shrink-0"
-        >
-          <Play className={`w-4 h-4 mr-2 ${running ? "animate-pulse" : ""}`} />
-          {running ? "Running..." : "Run Now"}
-        </Button>
+      <div>
+        <h3 className="text-lg font-bold text-white">Scrape Configuration</h3>
+        <p className="text-sm text-zinc-400 mt-1">Keywords and companies the scraper targets. Runs automatically on your cron schedule.</p>
       </div>
 
       {/* Keywords */}

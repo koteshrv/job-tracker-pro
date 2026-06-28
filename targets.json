@@ -1,0 +1,216 @@
+[
+  {
+    "company": "Meesho",
+    "type": "lever",
+    "api_board_token": "meesho"
+  },
+  {
+    "company": "Atlassian",
+    "type": "lever",
+    "api_board_token": "atlassian"
+  },
+  {
+    "company": "PhonePe",
+    "type": "greenhouse",
+    "api_board_token": "phonepe"
+  },
+  {
+    "company": "Wells Fargo",
+    "type": "playwright",
+    "url": "https://www.wellsfargojobs.com/en/jobs/?search={keyword}&country=India",
+    "no_results_text": "0 jobs",
+    "extra_wait_ms": 4000,
+    "job_url_pattern": "/jobs/r-\\d+"
+  },
+  {
+    "company": "Mastercard",
+    "type": "playwright",
+    "url": "https://careers.mastercard.com/us/en/search-results?keywords={keyword}",
+    "no_results_text": "0 results"
+  },
+  {
+    "company": "JP Morgan Chase",
+    "type": "playwright",
+    "url": "https://jpmc.fa.oraclecloud.com/hcmUI/CandidateExperience/en/sites/CX_1001/jobs?keyword={keyword}&location=India&locationId=300000000289360&locationLevel=country&mode=location",
+    "no_results_text": "no jobs found",
+    "extra_wait_ms": 6000,
+    "infinite_scroll": true
+  },
+  {
+    "company": "Infosys",
+    "type": "playwright",
+    "url": "https://career.infosys.com/jobs?companyhiringtype=IL&countrycode=IN&keyword={keyword}",
+    "no_results_text": "0 records found",
+    "job_selector": ".job-title a"
+  },
+  {
+    "company": "Cognizant",
+    "type": "playwright",
+    "url": "https://careers.cognizant.com/global-en/jobs/?keyword={keyword}&location=India&radius=100&lat=&lng=&cname=India&ccode=IN&pagesize=10#results",
+    "no_results_text": "0 results",
+    "extra_wait_ms": 5000,
+    "job_url_pattern": "/jobs/\\d+"
+  },
+  {
+    "company": "Capgemini",
+    "type": "playwright",
+    "url": "https://www.capgemini.com/in-en/careers/join-capgemini/job-search/?page=1&size=11&country_code=in-en&keyword={keyword}",
+    "no_results_text": "0 results",
+    "next_btn_selector": "[class*='Pagination-module__next']",
+    "force_url_pagination": true,
+    "job_url_pattern": "/jobs/\\d+"
+  },
+  {
+    "company": "LTIMindtree",
+    "type": "playwright",
+    "url": "https://careers.ltimindtree.com/search/?createNewAlert=false&q={keyword}&locationsearch=india",
+    "no_results_text": "0 results",
+    "job_selector": ".searchResults a.jobTitle-link"
+  },
+  {
+    "company": "Barclays",
+    "type": "playwright",
+    "url": "https://search.jobs.barclays/search-jobs?k={keyword}&l=Telangana%2C+IN&orgIds=13015",
+    "no_results_text": "0 jobs"
+  },
+  {
+    "company": "Citi",
+    "type": "playwright",
+    "url": "https://jobs.citi.com/search-jobs?k={keyword}&l=India&orgIds=287",
+    "no_results_text": "0 jobs",
+    "job_url_pattern": "/job/.*?/\\d+"
+  },
+  {
+    "company": "Visa",
+    "type": "playwright",
+    "url": "https://careers.smartrecruiters.com/Visa?keyword={keyword}",
+    "no_results_text": "we couldn't find any jobs"
+  },
+  {
+    "company": "Wipro",
+    "type": "playwright",
+    "url": "https://careers.wipro.com/search/?q={keyword}&locationsearch=India&searchResultView=LIST",
+    "no_results_text": "0 results"
+  },
+  {
+    "company": "HCLTech",
+    "type": "playwright",
+    "url": "https://careers.hcltech.com/search/?q={keyword}&locationsearch=&searchResultView=LIST&markerViewed=&carouselIndex=&facetFilters=%7B%22custCountryRegion%22%3A%5B%22India%22%5D%7D&pageNumber=0",
+    "no_results_text": "0 results"
+  },
+  {
+    "company": "Accenture",
+    "type": "playwright",
+    "url": "https://www.accenture.com/in-en/careers/jobsearch?jk={keyword}&sb=0",
+    "no_results_text": "0 results"
+  },
+  {
+    "company": "IBM",
+    "type": "playwright",
+    "url": "https://www.ibm.com/in-en/careers/search?field_keyword_05[0]=India&q={keyword}",
+    "no_results_text": "0 results"
+  },
+  {
+    "company": "Deloitte",
+    "type": "playwright",
+    "url": "https://southasiacareers.deloitte.com/search/?createNewAlert=false&q={keyword}&locationsearch=&optionsFacetsDD_city=&optionsFacetsDD_customfield2=",
+    "no_results_text": "0 results"
+  },
+  {
+    "company": "TCS",
+    "type": "tcs_api",
+    "url": "https://ibegin.tcsapps.com/candidate/api/v1/jobs/searchJ",
+    "headers": {
+      "Accept": "application/json, text/plain, */*",
+      "Content-Type": "application/json;charset=UTF-8",
+      "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36"
+    },
+    "payload": "{\"jobTitle\":\"{keyword}\",\"jobCity\":\"\",\"jobFunction\":null,\"jobExperience\":null,\"jobSkill\":null,\"pageNumber\":\"1\",\"userText\":\"\",\"jobTitleOrder\":null,\"jobCityOrder\":null,\"jobFunctionOrder\":null,\"jobExperienceOrder\":null,\"applyByOrder\":null,\"regular\":true,\"walkin\":true}",
+    "no_results_text": "\"totaljobs\":0"
+  },
+  {
+    "company": "Tech Mahindra",
+    "type": "tech_mahindra",
+    "url": "https://careers.techmahindra.com/",
+    "no_results_text": "0 results"
+  },
+  {
+    "company": "Google",
+    "type": "playwright",
+    "url": "https://www.google.com/about/careers/applications/jobs/results/?q={keyword}&location=India",
+    "no_results_text": "did not match any jobs",
+    "extra_wait_ms": 5000,
+    "job_url_pattern": "/results/\\d+"
+  },
+  {
+    "company": "Amazon",
+    "type": "playwright",
+    "url": "https://www.amazon.jobs/en/search?base_query={keyword}&loc_query=India",
+    "no_results_text": "we didn't find any jobs",
+    "job_url_pattern": "/jobs/\\d+"
+  },
+  {
+    "company": "Microsoft",
+    "type": "playwright",
+    "url": "https://apply.careers.microsoft.com/careers?query={keyword}&start=0&location=India&sort_by=relevance&filter_include_remote=1",
+    "no_results_text": "no jobs found",
+    "extra_wait_ms": 6000,
+    "job_url_pattern": "/job/\\d+"
+  },
+  {
+    "company": "Apple",
+    "type": "playwright",
+    "url": "https://jobs.apple.com/en-in/search?search={keyword}&location=india-IND",
+    "no_results_text": "0 results found",
+    "extra_wait_ms": 5000,
+    "job_url_pattern": "/details/\\d+"
+  },
+  {
+    "company": "Meta",
+    "type": "playwright",
+    "url": "https://www.metacareers.com/jobs/?q={keyword}&location=India",
+    "no_results_text": "0 jobs"
+  },
+  {
+    "company": "Stripe",
+    "type": "greenhouse",
+    "api_board_token": "stripe"
+  },
+  {
+    "company": "Airbnb",
+    "type": "greenhouse",
+    "api_board_token": "airbnb"
+  },
+  {
+    "company": "Snowflake",
+    "type": "greenhouse",
+    "api_board_token": "snowflake"
+  },
+  {
+    "company": "Databricks",
+    "type": "greenhouse",
+    "api_board_token": "databricks"
+  },
+  {
+    "company": "Coinbase",
+    "type": "playwright",
+    "url": "https://www.coinbase.com/careers/positions?department=Engineering",
+    "no_results_text": "0 open roles"
+  },
+  {
+    "company": "Figma",
+    "type": "lever",
+    "api_board_token": "figma"
+  },
+  {
+    "company": "Notion",
+    "type": "lever",
+    "api_board_token": "notionhq"
+  },
+  {
+    "company": "SmartRecruiters Global",
+    "type": "playwright",
+    "url": "https://jobs.smartrecruiters.com/?keyword={keyword}",
+    "no_results_text": "0 jobs"
+  }
+]

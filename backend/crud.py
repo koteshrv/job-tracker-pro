@@ -1,9 +1,10 @@
 from sqlalchemy.orm import Session
 from . import models, schemas
 from .crypto import encrypt_value, decrypt_value
+from datetime import datetime, timedelta, timezone
 
 def get_jobs(db: Session, skip: int = 0, limit: int = 100):
-    return db.query(models.Job).order_by(models.Job.created_at.desc()).offset(skip).limit(limit).all()
+    return db.query(models.Job).filter(models.Job.status != 'FALSE_POSITIVE').order_by(models.Job.created_at.desc()).offset(skip).limit(limit).all()
 
 def get_job(db: Session, job_id: int):
     return db.query(models.Job).filter(models.Job.id == job_id).first()
@@ -129,11 +130,29 @@ def fail_orphaned_running_logs(db: Session) -> int:
         db.commit()
     return len(orphans)
 
-def update_scraper_log(db: Session, log_id: int, **fields):
-    db_log = db.query(models.ScraperLog).filter(models.ScraperLog.id == log_id).first()
-    if db_log:
-        for key, value in fields.items():
-            setattr(db_log, key, value)
+def update_scraper_log(db: Session, log_id: int, status: str = None, jobs_found: int = None, error_message: str = None, detailed_logs: str = None, raw_logs: str = None) -> models.ScraperLog:
+    log = db.query(models.ScraperLog).filter(models.ScraperLog.id == log_id).first()
+    if log:
+        if status is not None:
+            log.status = status
+        if jobs_found is not None:
+            log.jobs_found = jobs_found
+        if error_message is not None:
+            log.error_message = error_message
+        if detailed_logs is not None:
+            log.detailed_logs = detailed_logs
+        if raw_logs is not None:
+            log.raw_logs = raw_logs
         db.commit()
-        db.refresh(db_log)
-    return db_log
+        db.refresh(log)
+    return log
+
+def delete_old_scraper_logs(db: Session, days: int = 14) -> int:
+    cutoff_date = datetime.now(timezone.utc) - timedelta(days=days)
+    old_logs = db.query(models.ScraperLog).filter(models.ScraperLog.timestamp < cutoff_date).all()
+    count = len(old_logs)
+    if count > 0:
+        for log in old_logs:
+            db.delete(log)
+        db.commit()
+    return count

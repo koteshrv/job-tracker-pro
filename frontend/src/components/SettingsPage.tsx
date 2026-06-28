@@ -477,31 +477,32 @@ export function SettingsPage() {
               </div>
               <ModelPriorityPicker
                 label="Model Priority List (fallbacks in order)"
-                value={settings.gemini_model || "gemini-2.5-flash, gemini-1.5-flash"}
+                value={settings.gemini_model || "gemini-3.1-flash-lite, gemini-3.5-flash, gemini-2.5-flash"}
                 onChange={v => setSettings({...settings, gemini_model: v})}
                 suggestions={[
-                  { value: "gemini-2.5-flash",   label: "gemini-2.5-flash",   badge: "500 req/day free" },
-                  { value: "gemini-1.5-flash",   label: "gemini-1.5-flash",   badge: "1500 req/day free" },
-                  { value: "gemini-2.0-flash",   label: "gemini-2.0-flash",   badge: "1500 req/day free" },
-                  { value: "gemini-flash-latest",label: "gemini-flash-latest", badge: "→ latest stable flash" },
-                  { value: "gemini-1.5-pro",     label: "gemini-1.5-pro",     badge: "50 req/day free" },
-                  { value: "gemini-2.5-pro",     label: "gemini-2.5-pro",     badge: "50 req/day free" },
+                  { value: "gemini-3.1-flash-lite", label: "gemini-3.1-flash-lite", badge: "500 RPD · High Capacity" },
+                  { value: "gemini-3.5-flash",      label: "gemini-3.5-flash",      badge: "20 RPD · Premium" },
+                  { value: "gemini-3-flash",        label: "gemini-3-flash",        badge: "20 RPD" },
+                  { value: "gemini-2.5-flash",      label: "gemini-2.5-flash",      badge: "20 RPD" },
+                  { value: "gemma-4-31b",           label: "gemma-4-31b",           badge: "1500 RPD · Text Only" },
                 ]}
               />
               {(() => {
                 if (!settings?.model_telemetry) return null;
-                // Helper: same logic as AnalyticsPage
+                // Accurate RPD limits per model as of June 2026 (v1beta free tier)
                 const getLimit = (model: string) => {
                   const m = (model || "").toLowerCase()
-                  if (m.includes("pro")) return 50
-                  if (m === "gemini-flash-latest" || m.endsWith("-flash-latest")) return 500
-                  if (m.includes("2.5") || m.includes("3.") || m.includes("preview") || m.includes("exp")) return 500
-                  if (m.includes("1.5") || m.includes("2.0")) return 1500
-                  return -1
+                  if (m.includes("gemma-4")) return 1500
+                  if (m.includes("3.1-flash-lite")) return 500
+                  if (m === "antigravity") return 100
+                  if (m.includes("flash")) return 20 // 3.5, 3.0, 2.5 flash are strictly capped at 20
+                  if (m.includes("pro")) return 0 // typically disabled on free tier
+                  return 20 // default for unknown models
+
                 }
                 try {
                   const parsed = JSON.parse(settings.model_telemetry);
-                  const primaryModel = settings.gemini_model?.split(",")[0]?.trim() || "gemini-2.5-flash"
+                  const primaryModel = settings.gemini_model?.split(",")[0]?.trim() || "gemini-1.5-flash"
                   const currentStats = parsed[primaryModel];
                   if (currentStats) {
                     const limit = getLimit(primaryModel)
