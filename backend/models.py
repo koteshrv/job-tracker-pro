@@ -40,6 +40,7 @@ class Settings(Base):
     custom_guidelines = Column(String, nullable=True)
     model_telemetry = Column(String, nullable=True) # JSON object tracking per-model statistics
     api_key_tag = Column(String, nullable=True)
+    max_pages = Column(Integer, default=3)
     
     # AI Provider routing
     ai_mode = Column(String, default="gemini") # "gemini", "openai", "anthropic", "grok", "ollama"

@@ -712,6 +712,11 @@ async def fetch_job_description(url: str) -> str:
                 pass
 
 async def process_playwright(db: Session, targets: List[dict], keywords: List[str], new_jobs: list, company_logs: list, headless: bool = True):
+    from . import crud
+    settings = crud.get_settings(db)
+    max_pages_limit = settings.max_pages if settings and settings.max_pages else 3
+    
+    # Set headless to false for full browser bypassing if running inside docker or normally
     if not targets: return
     async with async_playwright() as p:
         args = [
@@ -765,7 +770,7 @@ async def process_playwright(db: Session, targets: List[dict], keywords: List[st
                     content = (await page.content()).lower()
                     if no_results_text not in content:
                         intersect_extracted = await extract_playwright_jobs(
-                            page, "intersection", intersect_with, 
+                            page, "intersection", intersect_with, max_pages=max_pages_limit,
                             infinite_scroll=infinite_scroll, 
                             job_url_pattern=job_url_pattern, 
                             next_btn_selector=next_btn_selector,
@@ -852,9 +857,9 @@ async def process_playwright(db: Session, targets: List[dict], keywords: List[st
                         logger.debug(f"[{company}] No results for keyword '{keyword}' (found no_results_text)")
                     else:
                         extracted = await extract_playwright_jobs(
-                            page, keyword, url, 
-                            infinite_scroll=infinite_scroll, 
-                            job_url_pattern=job_url_pattern, 
+                            page, keyword, url, max_pages=max_pages_limit,
+                            infinite_scroll=infinite_scroll,
+                            job_url_pattern=job_url_pattern,
                             next_btn_selector=next_btn_selector,
                             force_url_pagination=force_url_pagination
                         )

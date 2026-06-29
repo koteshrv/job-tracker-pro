@@ -349,7 +349,7 @@ const TECH_KEYWORDS = [
                 disabled={generatingCL}
                 className="bg-purple-600 hover:bg-purple-500 text-white h-8 text-xs shadow-lg shadow-purple-500/20"
               >
-                {generatingCL ? "Generating..." : "Generate with Gemini"}
+                {generatingCL ? "Generating..." : "Generate with AI"}
               </Button>
             </div>
             
@@ -400,7 +400,7 @@ const TECH_KEYWORDS = [
                   disabled={generatingResume}
                   className="bg-emerald-600 hover:bg-emerald-500 text-white h-8 text-xs shadow-lg shadow-emerald-500/20"
                 >
-                  {generatingResume ? "Tailoring..." : "Tailor with Gemini"}
+                  {generatingResume ? "Tailoring..." : "Tailor with AI"}
                 </Button>
               </div>
             </div>

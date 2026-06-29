@@ -213,14 +213,8 @@ export function SettingsPage() {
     }
     const updatedKws = [...current, newSkill.trim()]
     const updatedSettings = { ...settings, extracted_keywords: JSON.stringify(updatedKws) }
-    try {
-      await api.put("/api/settings", updatedSettings)
-      setSettings(updatedSettings)
-      setNewSkill("")
-      toast("Skill added", "success")
-    } catch {
-      toast("Failed to add skill", "error")
-    }
+    setSettings(updatedSettings)
+    setNewSkill("")
   }
 
   const handleDeleteSkill = async (skillToDelete: string) => {
@@ -233,13 +227,7 @@ export function SettingsPage() {
     if (!Array.isArray(current)) current = []
     const updatedKws = current.filter((k: string) => k !== skillToDelete)
     const updatedSettings = { ...settings, extracted_keywords: JSON.stringify(updatedKws) }
-    try {
-      await api.put("/api/settings", updatedSettings)
-      setSettings(updatedSettings)
-      toast("Skill removed", "success")
-    } catch {
-      toast("Failed to remove skill", "error")
-    }
+    setSettings(updatedSettings)
   }
 
   useEffect(() => {
@@ -281,16 +269,7 @@ export function SettingsPage() {
   const handleSave = async () => {
     setSaving(true)
     try {
-      // Only send the fields this card owns, so it doesn't clobber the
-      // keywords/companies managed by the Scrape Configuration card.
-      await api.put("/api/settings", {
-        telegram_chat_id: settings.telegram_chat_id,
-        telegram_bot_token: settings.telegram_bot_token,
-        gemini_api_key: settings.gemini_api_key,
-        gemini_model: settings.gemini_model,
-        cron_schedule: settings.cron_schedule,
-        trash_retention_days: Number(settings.trash_retention_days),
-      })
+      await api.put("/api/settings", settings)
       toast("Settings saved successfully!", "success")
     } catch (e) {
       toast("Error saving settings", "error")
@@ -326,9 +305,21 @@ export function SettingsPage() {
   )
 
   return (
-    <div className="max-w-2xl mx-auto p-8 space-y-8 animate-in fade-in slide-in-from-bottom-4 duration-500">
+    <div className="max-w-2xl mx-auto pb-16 space-y-8 animate-in fade-in slide-in-from-bottom-4 duration-500 relative">
+      
+      {/* Sticky Global Save Header */}
+      <div className="sticky top-0 z-50 -mx-4 px-4 py-3 bg-[#0a0a0f]/90 backdrop-blur-xl border-b border-white/5 flex justify-between items-center shadow-2xl mb-8 rounded-b-2xl">
+        <div>
+          <h2 className="text-lg font-bold text-white">Application Settings</h2>
+          <p className="text-xs text-zinc-400">Configure your scraper, AI models, and resumes.</p>
+        </div>
+        <Button onClick={handleSave} disabled={saving} className="bg-indigo-600 hover:bg-indigo-500 text-white shadow-lg shadow-indigo-500/20">
+          <Check className="w-4 h-4 mr-2" />
+          {saving ? "Saving..." : "Save Settings"}
+        </Button>
+      </div>
 
-      <ScrapeConfig />
+      <ScrapeConfig settings={settings} onChange={setSettings} />
 
       <div className="bg-[#12141a] rounded-2xl border border-white/5 p-6 shadow-xl">
         <h3 className="text-lg font-bold text-white mb-4">Resume & AI Configuration</h3>
@@ -714,13 +705,7 @@ export function SettingsPage() {
           <p className="text-xs text-zinc-500 mt-1">Jobs in the Trash state older than this will be permanently deleted during cron scrapes. Set to 0 to disable auto-cleanup.</p>
         </div>
         
-        <div className="pt-4 flex justify-end">
-          <Button onClick={handleSave} disabled={saving} className="bg-indigo-600 hover:bg-indigo-500 text-white">
-            {saving ? "Saving..." : "Save Settings"}
-          </Button>
-        </div>
       </div>
-
     </div>
   )
 }

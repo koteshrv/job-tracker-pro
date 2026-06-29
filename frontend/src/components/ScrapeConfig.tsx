@@ -1,23 +1,13 @@
 import { useState, useEffect } from "react"
 import { api } from "@/lib/api"
-import { Button } from "@/components/ui/button"
-import { useToast } from "./Toast"
 import { X, Check } from "lucide-react"
 
-export function ScrapeConfig() {
-  const { toast } = useToast()
-  const [keywords, setKeywords] = useState<string[]>([])
+export function ScrapeConfig({ settings, onChange }: { settings: any, onChange: (s: any) => void }) {
   const [companies, setCompanies] = useState<string[]>([])
-  const [activeCompanies, setActiveCompanies] = useState<string[]>([])
   const [keywordInput, setKeywordInput] = useState("")
-  const [saving, setSaving] = useState(false)
 
   useEffect(() => {
     api.get("/api/companies").then(res => setCompanies(res.data.companies || []))
-    api.get("/api/settings").then(res => {
-      setKeywords(parseList(res.data.search_keywords))
-      setActiveCompanies(parseList(res.data.active_companies))
-    })
   }, [])
 
   const parseList = (raw: string | null | undefined): string[] => {
@@ -29,6 +19,12 @@ export function ScrapeConfig() {
       return []
     }
   }
+
+  const keywords = parseList(settings?.search_keywords)
+  const activeCompanies = parseList(settings?.active_companies)
+
+  const setKeywords = (kws: string[]) => onChange({ ...settings, search_keywords: JSON.stringify(kws) })
+  const setActiveCompanies = (comps: string[]) => onChange({ ...settings, active_companies: JSON.stringify(comps) })
 
   const addKeyword = () => {
     const v = keywordInput.trim().toLowerCase()
@@ -51,20 +47,6 @@ export function ScrapeConfig() {
     setActiveCompanies(activeCompanies.includes(c) ? activeCompanies.filter(x => x !== c) : [...activeCompanies, c])
 
   const allCompanies = activeCompanies.length === 0
-
-  const handleSave = async () => {
-    setSaving(true)
-    try {
-      await api.put("/api/settings", {
-        search_keywords: JSON.stringify(keywords),
-        active_companies: JSON.stringify(activeCompanies),
-      })
-      toast("Scrape configuration saved", "success")
-    } catch {
-      toast("Error saving scrape configuration", "error")
-    }
-    setSaving(false)
-  }
 
   return (
     <div className="bg-[#12141a] rounded-2xl border border-white/5 p-6 shadow-xl space-y-6">
@@ -134,11 +116,21 @@ export function ScrapeConfig() {
         </div>
       </div>
 
-      <div className="flex justify-end">
-        <Button onClick={handleSave} disabled={saving} className="bg-indigo-600 hover:bg-indigo-500 text-white">
-          {saving ? "Saving..." : "Save Scrape Config"}
-        </Button>
+      {/* Max Pages */}
+      <div>
+        <label className="block text-sm font-medium text-zinc-400 mb-2">Max Pages to Scrape (Pagination limit)</label>
+        <input
+          type="number"
+          min="1"
+          max="50"
+          value={settings?.max_pages || 3}
+          onChange={e => onChange({ ...settings, max_pages: parseInt(e.target.value) || 3 })}
+          className="w-full bg-black/40 border border-white/10 rounded-lg px-3 py-2 text-sm text-white focus:outline-none focus:border-blue-500/50 transition-colors"
+        />
+        <p className="text-xs text-zinc-500 mt-1">Maximum number of job list pages to scrape per company (default 3).</p>
       </div>
+
+      {/* Save button removed (lifted to global settings) */}
     </div>
   )
 }

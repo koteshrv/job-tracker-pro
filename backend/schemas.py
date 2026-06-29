@@ -74,6 +74,7 @@ class SettingsBase(BaseModel):
     custom_guidelines: Optional[str] = None
     model_telemetry: Optional[str] = None
     api_key_tag: Optional[str] = None
+    max_pages: Optional[int] = 3
     
     ai_mode: Optional[str] = "gemini"
     openai_api_key: Optional[str] = None
