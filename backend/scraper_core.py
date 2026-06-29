@@ -16,7 +16,6 @@ from datetime import datetime, timedelta
 from typing import List, Dict, Any
 from sqlalchemy.orm import Session
 from . import models, schemas
-import re
 from playwright.async_api import async_playwright
 from playwright_stealth import Stealth
 try:
@@ -302,52 +301,6 @@ def process_api_post(db: Session, target: dict, keywords: List[str], new_jobs: l
     else:
         company_logs.append({"company": company, "status": "SUCCESS", "jobs_found": jobs_found_count})
 
-def process_tcs_api(db: Session, target: dict, keywords: List[str], new_jobs: list, company_logs: list):
-    company = target.get("company", "TCS")
-    url = target.get("url", "https://ibegin.tcsapps.com/candidate/api/v1/jobs/searchJ")
-    
-    headers = {
-        "Accept": "application/json, text/plain, */*",
-        "Content-Type": "application/json;charset=UTF-8",
-        "Origin": "https://ibegin.tcsapps.com",
-        "Referer": "https://ibegin.tcsapps.com/candidate/jobs/search",
-        "User-Agent": "Mozilla/5.0"
-    }
-
-    jobs_found_count = 0
-    has_error = False
-    error_msg = ""
-    for keyword in keywords:
-        try:
-            payload = {
-                "jobCity": "", "jobFunction": "", "jobExperience": "", "jobSkill": None,
-                "pageNumber": "1", "userText": keyword, "jobTitleOrder": None, "jobCityOrder": None,
-                "jobFunctionOrder": None, "jobExperienceOrder": None, "applyByOrder": None,
-                "regular": True, "walkin": True
-            }
-            r = requests.post(url, headers=headers, json=payload, timeout=15)
-            if r.status_code == 200:
-                data = r.json()
-                # Assuming data structure is {"jobSearchInfo": [{"title": "...", "jobId": "..."}]}
-                jobs = data.get("jobSearchInfo", []) if isinstance(data, dict) else (data if isinstance(data, list) else [])
-                for job in jobs:
-                    title = job.get("title", "")
-                    job_id = job.get("jobId", "")
-                    if title and job_id:
-                        job_url = f"https://ibegin.tcsapps.com/candidate/job-details/{job_id}"
-                        if not has_been_notified(db, job_url):
-                            new_jobs.append({"company": company, "title": title, "url": job_url, "location": ""})
-                            jobs_found_count += 1
-        except Exception as e:
-            logger.error(f"Error processing TCS API {company}: {e}")
-            has_error = True
-            error_msg = str(e)
-            
-    if has_error:
-        company_logs.append({"company": company, "status": "FAILED", "jobs_found": jobs_found_count, "message": error_msg})
-    else:
-        company_logs.append({"company": company, "status": "SUCCESS", "jobs_found": jobs_found_count})
-
 
 def process_tech_mahindra(db: Session, target: dict, keywords: List[str], new_jobs: list, company_logs: list):
     company = target.get("company", "Tech Mahindra")
@@ -418,8 +371,6 @@ def process_tech_mahindra(db: Session, target: dict, keywords: List[str], new_jo
     if has_error:
         company_logs.append({"company": company, "status": "FAILED", "jobs_found": jobs_found_count, "message": error_msg})
     else:
-        company_logs.append({"company": company, "status": "SUCCESS", "jobs_found": jobs_found_count})
-
         company_logs.append({"company": company, "status": "SUCCESS", "jobs_found": jobs_found_count})
 
 
@@ -516,15 +467,53 @@ async def extract_playwright_jobs(page, keyword: str, source_url: str, max_pages
     
     try:
         for i in range(max_pages): # Scrape up to max_pages
-            await page.wait_for_timeout(2000)
+            if "tcsapps.com" in source_url:
+                try:
+                    # Wait for the API call to finish so the pagination block is no longer hidden
+                    await page.wait_for_selector("#paging:not(.ng-hide)", timeout=15000)
+                except:
+                    pass
+            
+            await page.wait_for_timeout(500)
             await dismiss_popups(page)  # Dismiss on every page/iteration
             
             html_snippet = await page.evaluate(r'''() => {
-                return Array.from(document.querySelectorAll('a[href]')).map(el => {
+                let results = [];
+                // 1. Standard anchor tags
+                document.querySelectorAll('a[href]').forEach(el => {
                     const text = (el.innerText || el.getAttribute('aria-label') || el.title || "").replace(/\s+/g, ' ').trim();
-                    const href = el.href || "";
-                    return {title: text, href: href};
-                }).filter(x => x.href && x.href.startsWith('http') && x.title !== undefined);
+                    results.push({title: text, href: el.href || ""});
+                });
+                
+                // 2. AngularJS click handlers with string literals
+                document.querySelectorAll('[data-ng-click*="/jobs/"]').forEach(el => {
+                    const clickAttr = el.getAttribute('data-ng-click') || "";
+                    const match = clickAttr.match(/goTo\(['"]?(\/jobs\/[^'"]+)['"]?\)/);
+                    if (match) {
+                        const href = window.location.origin + '/candidate' + match[1];
+                        const text = (el.innerText || "").replace(/\s+/g, ' ').trim();
+                        results.push({title: text, href: href});
+                    }
+                });
+                
+                // 3. AngularJS dynamic scope extraction (TCS iBegin)
+                if (window.angular) {
+                    document.querySelectorAll('.job-window, [data-ng-repeat*=" in "], [data-ng-click^="jobDesc"]').forEach(el => {
+                        try {
+                            const scope = window.angular.element(el).scope();
+                            if (scope) {
+                                const jobObj = scope.job || scope.j;
+                                if (jobObj && jobObj.jobId) {
+                                    const href = window.location.origin + '/candidate/job-details/' + jobObj.jobId;
+                                    const title = jobObj.title || "";
+                                    results.push({title: title, href: href});
+                                }
+                            }
+                        } catch (e) {}
+                    });
+                }
+                
+                return results.filter(x => x.href && x.href.startsWith('http') && x.title !== undefined);
             }''')
             
             new_this_page = 0
@@ -583,31 +572,31 @@ async def extract_playwright_jobs(page, keyword: str, source_url: str, max_pages
                 else:
                     # Try to click next page button
                     next_btn = await page.evaluate_handle('''([selector]) => {
-                    if (selector) {
-                        const b = document.querySelector(selector);
-                        if (b && !b.disabled && b.getAttribute('aria-disabled') !== 'true' && !b.classList.contains('disabled')) {
-                            const style = window.getComputedStyle(b);
-                            if (style.display !== 'none' && style.visibility !== 'hidden') return b;
-                        }
-                    }
-                    
-                    // Fallback to heuristic matches
-                    const exact_btns = Array.from(document.querySelectorAll('button, a, [role="button"], [role="link"], .pagination-next, .next'));
-                    for (const b of exact_btns) {
-                        const text = (b.innerText || "").toLowerCase().trim();
-                        const aria = (b.getAttribute('aria-label') || "").toLowerCase();
-                        if (text === "next" || text === "next page" || text === ">" || text === "›" || aria.includes("next")) {
-                            if (!b.disabled && b.getAttribute('aria-disabled') !== 'true' && !b.classList.contains('disabled')) {
-                                // Ignore hidden elements
+                        if (selector) {
+                            const b = document.querySelector(selector);
+                            if (b && !b.disabled && b.getAttribute('aria-disabled') !== 'true' && !b.classList.contains('disabled')) {
                                 const style = window.getComputedStyle(b);
-                                if (style.display !== 'none' && style.visibility !== 'hidden') {
-                                    return b;
+                                if (style.display !== 'none' && style.visibility !== 'hidden') return b;
+                            }
+                        }
+                        
+                        // Fallback to heuristic matches
+                        const exact_btns = Array.from(document.querySelectorAll('button, a, [role="button"], [role="link"], .pagination-next, .next'));
+                        for (const b of exact_btns) {
+                            const text = (b.innerText || "").toLowerCase().trim();
+                            const aria = (b.getAttribute('aria-label') || "").toLowerCase();
+                            if (text === "next" || text === "next page" || text === ">" || text === "›" || aria.includes("next")) {
+                                if (!b.disabled && b.getAttribute('aria-disabled') !== 'true' && !b.classList.contains('disabled')) {
+                                    // Ignore hidden elements
+                                    const style = window.getComputedStyle(b);
+                                    if (style.display !== 'none' && style.visibility !== 'hidden') {
+                                        return b;
+                                    }
                                 }
                             }
                         }
-                    }
-                    return null;
-                }''', [next_btn_selector])
+                        return null;
+                    }''', [next_btn_selector])
                 if not next_btn or not await next_btn.json_value():
                     # Fallback: if we can't find a Next button (or force_url_pagination is true), manipulate the source_url directly
                     if "page=" in source_url.lower():
@@ -622,9 +611,23 @@ async def extract_playwright_jobs(page, keyword: str, source_url: str, max_pages
                             continue
                     break
                 
-                # Dispatch a true MouseEvent with bubbles: true so React/Vue synthetic event listeners on the document root catch it.
-                # This bypasses all viewport/overlay/cookie banner issues completely.
+                # Prefer native Playwright click to perfectly mimic human interaction.
+                # This ensures SPA frameworks like Angular/React register the event properly in their zones.
                 try:
+                    # Scroll to bottom so the user visually sees the scroll happening
+                    await page.evaluate("window.scrollTo(0, document.body.scrollHeight)")
+                    await page.wait_for_timeout(500)
+                    
+                    # Scroll the element perfectly to the center of the screen to avoid sticky footers
+                    await page.evaluate("(btn) => btn.scrollIntoView({block: 'center', inline: 'center'})", next_btn)
+                    await page.wait_for_timeout(500)
+                    
+                    # (The network interceptor added during the initial search will automatically catch and fix pagination API calls!)
+                    
+                    # Use Playwright's trusted physical click so Angular's on-touch prevents the page from reloading
+                    await next_btn.click(timeout=5000)
+                except Exception as e:
+                    logger.debug(f"Native click failed: {e}, falling back to JS synthetic click")
                     await page.evaluate('''(btn) => {
                         btn.dispatchEvent(new MouseEvent('click', {
                             bubbles: true,
@@ -632,9 +635,6 @@ async def extract_playwright_jobs(page, keyword: str, source_url: str, max_pages
                             view: window
                         }));
                     }''', next_btn)
-                except Exception as e:
-                    logger.debug(f"JS click failed: {e}, falling back to native click")
-                    await next_btn.click(timeout=5000, force=True)
                 
                 # SPAs load content dynamically without triggering DOMContentLoaded. 
                 # A hard wait ensures network requests finish and DOM updates.
@@ -650,33 +650,6 @@ async def extract_playwright_jobs(page, keyword: str, source_url: str, max_pages
         
     logger.info(f"Raw link extraction yielded {len(jobs)} candidates from {page.url}")
     return jobs
-
-async def fetch_job_description(url: str) -> str:
-    """Fetch visible text from a URL using headless Playwright."""
-    try:
-        async with async_playwright() as p:
-            browser = await p.chromium.launch(headless=True, args=["--no-sandbox", "--disable-blink-features=AutomationControlled"])
-            context = await browser.new_context(viewport={"width": 1280, "height": 800})
-            page = await context.new_page()
-            await Stealth().apply_stealth_async(page)
-            
-            await page.goto(url, wait_until="domcontentloaded", timeout=20000)
-            
-            # Remove scripts, styles, and nav elements to get clean text
-            await page.evaluate('''() => {
-                document.querySelectorAll('script, style, noscript, nav, header, footer, iframe, svg').forEach(el => el.remove());
-            }''')
-            
-            # Extract text from body
-            text = await page.locator("body").inner_text()
-            await browser.close()
-            
-            # Clean up excessive whitespace
-            clean_text = re.sub(r'\\n+', '\\n\\n', text).strip()
-            return clean_text
-    except Exception as e:
-        logger.error(f"Failed to fetch JD from {url}: {e}")
-        return ""
 
 async def fetch_job_description(url: str) -> str:
     """Fetch visible text from a URL using headless Playwright."""
@@ -767,14 +740,54 @@ async def process_playwright(db: Session, targets: List[dict], keywords: List[st
             job_url_pattern = target.get("job_url_pattern")
             next_btn_selector = target.get("next_btn_selector")
             force_url_pagination = target.get("force_url_pagination", False)
+            intersect_with = target.get("intersect_with")
             
             jobs_found_count = 0
             has_error = False
             error_msg = ""
+            
+            intersect_seen = None
+            if intersect_with:
+                intersect_seen = set()
+                try:
+                    logger.info(f"[{company}] Running intersection pre-pass on {intersect_with}")
+                    extra_wait = target.get("extra_wait_ms", 0)
+                    try:
+                        if extra_wait > 0:
+                            await page.goto(intersect_with, wait_until="networkidle", timeout=45000)
+                        else:
+                            await page.goto(intersect_with, wait_until="domcontentloaded", timeout=30000)
+                    except Exception:
+                        pass
+                    await page.wait_for_timeout(5000 + extra_wait)
+                    await dismiss_popups(page)
+                    
+                    content = (await page.content()).lower()
+                    if no_results_text not in content:
+                        intersect_extracted = await extract_playwright_jobs(
+                            page, "intersection", intersect_with, 
+                            infinite_scroll=infinite_scroll, 
+                            job_url_pattern=job_url_pattern, 
+                            next_btn_selector=next_btn_selector,
+                            force_url_pagination=force_url_pagination
+                        )
+                        if intersect_extracted:
+                            for job in intersect_extracted:
+                                intersect_seen.add(job["href"])
+                    logger.info(f"[{company}] Intersection pass found {len(intersect_seen)} URLs")
+                except Exception as e:
+                    logger.error(f"[{company}] Intersection pass failed: {e}")
+
+            search_input_selector = target.get("search_input_selector")
+            search_btn_selector = target.get("search_btn_selector")
 
             company_seen = set()  # dedup across keyword searches for this company
             for keyword in keywords:
-                url = url_template.replace("{keyword}", urllib.parse.quote(keyword))
+                if search_input_selector:
+                    url = url_template.split('?')[0]
+                else:
+                    url = url_template.replace("{keyword}", urllib.parse.quote(keyword))
+                    
                 try:
                     logger.debug(f"[{company}] Navigating to: {url}")
                     extra_wait = target.get("extra_wait_ms", 0)
@@ -787,13 +800,53 @@ async def process_playwright(db: Session, targets: List[dict], keywords: List[st
                     except Exception:
                         # Fallback if networkidle times out
                         pass
-                    # Base wait + any extra configured for this target
-                    await page.wait_for_timeout(5000 + extra_wait)
+                        
+                    if search_input_selector:
+                        logger.info(f"[{company}] Executing UI search for '{keyword}'")
+                        await dismiss_popups(page)
+                        try:
+                            if "tcsapps.com" in url:
+                                # ULTIMATE FIX: Intercept the API requests at the network layer!
+                                # By dumping the raw API payload, we discovered the filter key is 'userText'.
+                                # This completely bypasses all Angular 1.x UI bugs by forcefully injecting 
+                                # the filter directly into outgoing HTTP requests (both initial and pagination).
+                                async def intercept_tcs(route, request):
+                                    if request.method == "POST":
+                                        try:
+                                            import json
+                                            data = json.loads(request.post_data)
+                                            data["userText"] = keyword
+                                            # Forward the modified payload to the server
+                                            await route.continue_(post_data=json.dumps(data).encode("utf-8"), headers=request.headers)
+                                        except Exception as e:
+                                            logger.error(f"TCS route intercept failed: {e}")
+                                            await route.continue_()
+                                    else:
+                                        await route.continue_()
+                                await page.route("**/api/v1/jobs/searchJ**", intercept_tcs)
+                                
+                            # Perform a basic UI interaction so Angular triggers the API request
+                            input_loc = page.locator(search_input_selector)
+                            await input_loc.fill(keyword, timeout=10000)
+                            await page.wait_for_timeout(500)
+                            await input_loc.press("Enter")
+                            
+                            # The API call wait is handled dynamically inside extract_playwright_jobs via #paging:not(.ng-hide)
+                        except Exception as ui_e:
+                            logger.error(f"UI search failed: {ui_e}")
+                    else:
+                        # Base wait + any extra configured for this target
+                        await page.wait_for_timeout(5000 + extra_wait)
                     
                     # Dismiss all popups before reading content or clicking pagination
                     await dismiss_popups(page)
                         
                     content = (await page.content()).lower()
+                    
+                    if company == "TCS":
+                        with open(f"/home/hari/job-scraper/tests/dump/tcs_debug_{keyword}.html", "w") as f:
+                            f.write(await page.content())
+                        logger.info(f"Dumped TCS DOM to tcs_debug_{keyword}.html")
 
                     if no_results_text in content:
                         logger.debug(f"[{company}] No results for keyword '{keyword}' (found no_results_text)")
@@ -809,6 +862,8 @@ async def process_playwright(db: Session, targets: List[dict], keywords: List[st
                         if extracted:
                             for job in extracted:
                                 href = job["href"]
+                                if intersect_seen is not None and href not in intersect_seen:
+                                    continue
                                 if href in company_seen:
                                     logger.debug(f"[{company}] Skipping duplicate URL: {href[:80]}")
                                     continue
@@ -881,8 +936,6 @@ def run_scraper(db: Session):
             process_lever(db, target, keywords, LOCATIONS, new_jobs, company_logs)
         elif t_type == "api_post":
             process_api_post(db, target, keywords, new_jobs, company_logs)
-        elif t_type == "tcs_api":
-            process_tcs_api(db, target, keywords, new_jobs, company_logs)
         elif t_type == "tech_mahindra":
             process_tech_mahindra(db, target, keywords, new_jobs, company_logs)
         elif t_type == "playwright":

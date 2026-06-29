@@ -64,8 +64,6 @@ async def test_all_targets(filter_companies: list = None, headless: bool = False
             process_lever(db, target, keywords, locations, new_jobs, company_logs)
         elif t_type == "api_post":
             process_api_post(db, target, keywords, new_jobs, company_logs)
-        elif t_type == "tcs_api":
-            process_tcs_api(db, target, keywords, new_jobs, company_logs)
         elif t_type == "tech_mahindra":
             process_tech_mahindra(db, target, keywords, new_jobs, company_logs)
         elif t_type == "playwright":
